@@ -4,16 +4,16 @@ import argparse
 import sys
 
 
-parser = argparse.ArgumentParser(description='Reverse DNS lookup.')
-parser.add_argument('IPs', nargs='+', help='IP ranges')
-parser.add_argument('-o', '--o', metavar='output', required=False, nargs='?', help='output filename')
+parser = argparse.ArgumentParser(description='Reverse dns lookup.')
+parser.add_argument('strings', nargs='+', help='IP ranges.')
+parser.add_argument('-o', required=True, help='Output filename.')
 args = parser.parse_args()
 
 
 
 print("###########################################################")
 print("#                Simple reverse DNS lookup                #")
-print("#                                                         #")
+print("#                     by Luis Teixeira                    #")
 print("###########################################################")
 
 
@@ -24,8 +24,7 @@ if args.o:
 		f.write('Reverse DNS lookup -- ' + (' ').join(sys.argv) + ' --\n\n')
 
 
-for target in args.IPs:
-	print "Scanning " + target
+for target in args.strings:
 	target = IPNetwork(target)
 	for ip in target:
 		com = 'host ' + str(ip)
@@ -37,5 +36,4 @@ for target in args.IPs:
 			with open(args.o,'a') as f:
 				f.write(r + '\n')
 
-print "Done"
 
