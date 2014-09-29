@@ -9,7 +9,8 @@ parser.add_argument('IPs', nargs='+', help='IP ranges')
 parser.add_argument('-o', '--o', metavar='output', required=False, nargs='?', help='output filename')
 args = parser.parse_args()
 
-
+scanCount = 0
+resultCount = 0
 
 print("###########################################################")
 print("#                Simple reverse DNS lookup                #")
@@ -28,14 +29,16 @@ for target in args.IPs:
 	print "Scanning " + target
 	target = IPNetwork(target)
 	for ip in target:
+		scanCount += 1
 		com = 'host ' + str(ip)
 		r = os.popen(com).read().split('pointer ')
 		if len(r) > 1:
-			
+			resultCount += 1
 			r = str(ip) + ',' + r[1].rstrip('.\n')
 			print r
-			with open(args.o,'a') as f:
-				f.write(r + '\n')
+			if args.o:
+				with open(args.o,'a') as f:
+					f.write(r + '\n')
 
-print "Done"
+print "Finished scanning", str(scanCount), "targets. Got", str(resultCount)+"/"+str(scanCount),"results."
 
