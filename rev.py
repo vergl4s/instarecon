@@ -12,12 +12,6 @@ args = parser.parse_args()
 scanCount = 0
 resultCount = 0
 
-print("###########################################################")
-print("#                Simple reverse DNS lookup                #")
-print("#                                                         #")
-print("###########################################################")
-
-
 
 #If result is to go to a file, reset the file (could implement check on the file that resumes tests)
 if args.o:
@@ -41,4 +35,3 @@ for target in args.IPs:
 					f.write(r + '\n')
 
 print "Finished scanning", str(scanCount), "targets. Got", str(resultCount)+"/"+str(scanCount),"results."
-
