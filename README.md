@@ -1,4 +1,6 @@
 rev_dns
 =======
 
-Simple reverse dns lookup
+Simple reverse dns lookup.
+
+Requires netaddr.
