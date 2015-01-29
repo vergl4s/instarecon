@@ -1,36 +1,133 @@
 #!/usr/bin/env python3
 import sys, socket, argparse
+from abc import ABCMeta, abstractmethod
 import whois #https://pypi.python.org/pypi/whois
 from ipwhois import IPWhois #https://pypi.python.org/pypi/ipwhois
 import ipaddress as ipa #https://docs.python.org/3/library/ipaddress.html
 import dns as d #http://www.dnspython.org/docs/1.12.0/
 
 
+
 class Host(object):
-	'''
-	Object that basically represents 1 IP address and all DNS, reverse DNS, Whois, and geo information associated with it.
-		category - 'ip', 'dns', 'net'
-		ip = IP address of the entry (unique identifier)
-		dns = any DNS that points to the IP address (can have multiple entries)
-		rev_dns = reverse DNS got from the IP (only one entry)
-		self.geo = geo information
-	'''
-	
-	def __init__(self, user_supplied, server=None):
+	'''Abstract class for Host being scanned. IP and Name classes inherit from this.'''
+	__metaclass__ = ABCMeta
 
-		self.category = None
+
+	def __init__(self):
+
 		self.ip = None
-		self.dns = []
-		self.rev_dns = None
+		self.names = []
+		self.rev_name = None
 		self.geo = None
+		self.whois_name = None
+		self.whois_ip = None
 
-		#Is it an IP?
+
+	@abstractmethod
+	def get_results(self):
+		""""Return basic information about a Host."""
+		pass
+
+	@abstractmethod
+	def resolve(self):
+		""""Start scanning process for a Host."""
+		pass
+
+	def get_host_by_name(self):
+		'''Return a triple (hostname, aliaslist, ipaddrlist) - https://docs.python.org/2/library/socket.html#socket.gethostbyname_ex'''
+		
+		return d.resolver.query(q)[0].to_text
+
+	#TODO - use dns library instead of socket
+	def get_host_by_addr(self):
+		'''Return a triple (hostname, aliaslist, ipaddrlist) - https://docs.python.org/2/library/socket.html#socket.gethostbyaddr'''
 		try:
-			
-			query = ipa.ip_address(user_supplied)
-			
-			self.category = 'ip'
-			self.ip = user_supplied
+			return socket.gethostbyaddr(str(self.ip))
+		except Exception as e:
+			pass
+			#raise e
+		
+
+	def get_whois_by_name(self):
+		if self.names:
+			return whois.query(self.names[0]).__dict__
+
+	def get_whois_by_ip(self):
+		return IPWhois(str(self.ip)).lookup()
+
+
+class IP(Host):
+	'''Host object created from user entry as IP address.
+
+		Attributes:
+	'''
+
+	def __init__(self, user_supplied, from_net=False):
+
+		self.names = []
+		self.ip = user_supplied
+		self.from_net = from_net
+
+	def get_id(self):
+		return self.ip
+
+	def get_results(self):
+		return self.names,self.ip,self.whois_name,self.whois_ip
+
+	def resolve(self):
+		self.rev_name = self.get_host_by_addr()
+		self.whois_name = self.get_whois_by_ip()
+		self.whois_ip = self.get_whois_by_name()
+		pass
+
+class Name(Host):
+	'''Host object created from user entry as name.'''
+
+	def __init__(self, user_supplied):
+		self.names = []
+		self.names.append(user_supplied)
+
+	def get_id(self):
+		return self.names[0]
+
+	def get_results(self):
+		return self.names,self.ip,self.whois_name,self.whois_ip
+
+	def resolve(self):
+		self.ip = self.get_host_by_name()
+		self.whois_name = self.get_whois_by_ip()
+		self.whois_ip = self.get_whois_by_name()
+		pass
+
+
+class Scan(object):
+	'''Class that will hold all Host entries, manage threads and determine scans to be made.'''
+
+	def __init__(self,server=None):
+
+		self.dns_server = server
+
+		self.hosts = []
+		self.bad_hosts = []
+		
+		if self.dns_server:
+			#Set DNS server - TODO test this to make sure server is really being changed
+			d.resolver.override_system_resolver(args.dns_server)
+
+
+	def add_host(self, user_supplied):
+
+		host = None
+
+		try:
+			#Is it an IP?
+			ip = ipa.ip_address(user_supplied)
+			if not (ip.is_multicast or ip.is_unspecified or ip.is_reserved or ip.is_loopback):
+				self.hosts.append(IP(ip))
+				return
+			else:
+				self.bad_hosts.append(user_supplied)
+				return
 		except Exception as e:
 			#print(e)
 			pass
@@ -38,92 +135,42 @@ class Host(object):
 			#Check if it is not multicast IP
 			pass
 
-		if not self.category:
+
+		try:
 			#Is it a valid network range?
-			try:
-				
-				query = ipa.ip_network(user_supplied)
-				
-				self.category = 'net'
-			except Exception as e:
-				#print(e)
-				pass
-
-		if not self.category:
-			#is it a valid DNS? Need to check against valid DNS characters
-			try:
-				#Set DNS server - TODO test this to make sure server is really being changed
-				d.resolver.override_system_resolver(server)
-				
-				query = d.resolver.query(user_supplied)
-				
-				self.category = 'dns'
-				self.dns = user_supplied
-				
-				#TODO maybe multiple results?
-				self.ip = self.get_host_by_name()
-			except Exception as e:
-				#print(e)
-				pass
-
-		#if it is still not set, then couldn't read value, kill instance
-		if not self.category:
-			self.category = 'bad'
-
-	def get_info(self):
-		if self.category == 'dns':
-			return self.dns
-		elif self.category == 'ip':
-			return self.ip
-		elif self.category == 'net':
-			return 'This is a subnet'
-
-	def resolve(self):
-		if self.category == 'dns':
+			net = ipa.ip_network(user_supplied)
+			#IP is acceptable as a network, but has num_addresses = 1
+			if net.num_addresses != 1:
+				for ip in net:
+					scan.add_host(ip)
+				return
+		except Exception as e:
+			#print(e)
 			pass
-		elif self.category == 'ip':
-			pass 
 
-	def resolve_dns(self):
-		pass
+		try:
+			#is it a valid DNS? Need to check against valid DNS characters
+			name = d.resolver.query(user_supplied)
+			self.hosts.append(Name(user_supplied))
 
-	def resolve_ip(self):
-		pass
+			return
+		except Exception as e:
+			print(e)
+			pass
 
-	def get_host_by_name(self, name=None):
-		'''Return a triple (hostname, aliaslist, ipaddrlist) - https://docs.python.org/2/library/socket.html#socket.gethostbyname_ex'''
-		q = name if name else self.dns
-		if q: #in case self.dns is not set
-			return d.resolver.query(q)[0].to_text
+		self.bad_hosts.append(user_supplied)
 
-	def get_host_by_addr(self):
-		'''Return a triple (hostname, aliaslist, ipaddrlist) - https://docs.python.org/2/library/socket.html#socket.gethostbyaddr'''
-		return socket.gethostbyaddr(self.ip)
+	def get_hosts(self):
+		return self.hosts
 
-	def whois_by_hostname(self):
-		return whois.query(self.dns).__dict__
+	def get_bad_hosts(self):
+		return self.bad_hosts
 
-	def whois_by_ip(self):
-		return IPWhois(str(self.ip)).lookup()
-
-
-class Scan(object):
-	'''
-	Class that will hold all Host entries and organise scanning macro
-	'''
-
-	def __init__(self):
-		self.hosts = []
-		pass
-
-	def add(self, host):
-		if host.category == 'bad':
-			print(host.get_info(), 'bad entry')
-		else:
-			scan.hosts.append(host)
-			print(host.get_info())
-
-
+	def start_scan(self):
+		for host in self.hosts:
+			print('#### {} ####'.format(host.get_id()))
+			host.resolve()
+			print(host.get_results())
 
 
 
@@ -136,36 +183,15 @@ if __name__ == '__main__':
 	args = parser.parse_args()
 
 
-	scan = Scan()
+	scan = Scan(args.server)
 	
-	for entry in args.IP:
-		scan.add(Host(entry))
+	for user_supplied in args.IP:
+		scan.add_host(user_supplied)
 
-	# scan_count = 0
-	# result_count = 0
-
-	# #If result is to go to a file, reset the file (could implement check on the file that resumes tests)
-	# if args.o:
-	# 	with open(args.o, 'w') as f:
-	# 		f.write('Reverse DNS lookup -- ' + (' ').join(sys.argv) + ' --\n\n')
+	print('Not scanning', len(scan.get_bad_hosts()), 'hosts')
+	print('Scanning',len(scan.get_hosts()),'hosts')
+	#scan.start_scan()
 
 
-	# for target in args.IP:
-	# 	print 'Scanning ' + target
-	# 	target = IPNetwork(target)
-	# 	for ip in target:
-	# 		IPt += 1
-
-	# 		name, alias, addresslist = socket.gethostbyaddr(str(ip))
-
-	# 		if len(name) > 1:
-	# 			result_count += 1
-	# 			name = str(ip) + ',' + name.rstrip('.\n')
-	# 			print name
-	# 			if args.o:
-	# 				with open(args.o,'a') as f:
-	# 					f.write(name + '\n')
-
-	# print 'Finished scanning', str(scan_count), 'targets. Got', str(result_count)+'/'+str(scan_count),'results.'
 
 
