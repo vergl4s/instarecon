@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 import sys, socket, argparse
 from abc import ABCMeta, abstractmethod
-import whois #https://pypi.python.org/pypi/whois
+import pythonwhois as whois #https://github.com/joepie91/python-whois
 from ipwhois import IPWhois #https://pypi.python.org/pypi/ipwhois
 import ipaddress as ipa #https://docs.python.org/3/library/ipaddress.html
-import dns as d #http://www.dnspython.org/docs/1.12.0/
+import dns.resolver #http://www.dnspython.org/docs/1.12.0/
 
 
 
 class Host(object):
-	'''Abstract class for Host being scanned. IP and Name classes inherit from this.'''
+	'''Abstract class for Host being scannedns. IP and Name classes inherit from this.'''
 	__metaclass__ = ABCMeta
 
 
@@ -26,6 +26,7 @@ class Host(object):
 	@abstractmethod
 	def get_results(self):
 		""""Return basic information about a Host."""
+		return self.names,self.rev_name,self.ip,self.whois_name,self.whois_ip
 		pass
 
 	@abstractmethod
@@ -34,88 +35,94 @@ class Host(object):
 		pass
 
 	def get_host_by_name(self):
-		'''Return a triple (hostname, aliaslist, ipaddrlist) - https://docs.python.org/2/library/socket.html#socket.gethostbyname_ex'''
-		
-		return d.resolver.query(q)[0].to_text
-
+		try:
+			return str(dns.resolver.query(self.names[0])[0])
+		except Exception as e:
+			raise e
+	
 	#TODO - use dns library instead of socket
 	def get_host_by_addr(self):
 		'''Return a triple (hostname, aliaslist, ipaddrlist) - https://docs.python.org/2/library/socket.html#socket.gethostbyaddr'''
 		try:
 			return socket.gethostbyaddr(str(self.ip))
 		except Exception as e:
-			pass
-			#raise e
+			raise e
 		
 
 	def get_whois_by_name(self):
-		if self.names:
-			return whois.query(self.names[0]).__dict__
+		try:
+			if self.names[0]:
+				return whois.get_whois(self.names[0])
+		except Exception as e:
+			raise e
+
+	def get_whois_by_rev_name(self):
+		try:
+			return whois.get_whois(self.rev_name)
+		except Exception as e:
+			raise e
+
 
 	def get_whois_by_ip(self):
-		return IPWhois(str(self.ip)).lookup()
+		if not self.ip.is_private:
+			try:
+				return IPWhois(str(self.ip)).lookup()
+			except Exception as e:
+				raise e
+				pass
 
 
 class IP(Host):
-	'''Host object created from user entry as IP address.
-
-		Attributes:
-	'''
+	'''Host object created from user entry as IP address.'''
 
 	def __init__(self, user_supplied, from_net=False):
-
-		self.names = []
+		Host.__init__(self)
 		self.ip = user_supplied
 		self.from_net = from_net
+		print(type(self.ip))
 
 	def get_id(self):
 		return self.ip
 
-	def get_results(self):
-		return self.names,self.ip,self.whois_name,self.whois_ip
-
 	def resolve(self):
-		self.rev_name = self.get_host_by_addr()
-		self.whois_name = self.get_whois_by_ip()
-		self.whois_ip = self.get_whois_by_name()
+		self.rev_name = self.get_host_by_addr()[0]
+		self.whois_name = self.get_whois_by_rev_name()
+		self.whois_ip = self.get_whois_by_ip()
 		pass
 
 class Name(Host):
 	'''Host object created from user entry as name.'''
 
 	def __init__(self, user_supplied):
-		self.names = []
+		Host.__init__(self)
 		self.names.append(user_supplied)
 
 	def get_id(self):
 		return self.names[0]
 
-	def get_results(self):
-		return self.names,self.ip,self.whois_name,self.whois_ip
-
 	def resolve(self):
-		self.ip = self.get_host_by_name()
+		self.ip = ipa.ip_address(self.get_host_by_name())
+		self.rev_name = self.get_host_by_addr()[0]
 		self.whois_name = self.get_whois_by_ip()
 		self.whois_ip = self.get_whois_by_name()
 		pass
 
 
 class Scan(object):
-	'''Class that will hold all Host entries, manage threads and determine scans to be made.'''
+	'''Class that will hold all Host entries, manage threads and scanning pipeline.'''
 
 	def __init__(self,server=None):
 
 		self.dns_server = server
-
 		self.hosts = []
 		self.bad_hosts = []
 		
 		if self.dns_server:
 			#Set DNS server - TODO test this to make sure server is really being changed
-			d.resolver.override_system_resolver(args.dns_server)
+			dns.resolver.override_system_resolver(args.dns_server)
 
 
-	def add_host(self, user_supplied):
+	def add_host(self, user_supplied, from_net=False):
 
 		host = None
 
@@ -123,7 +130,8 @@ class Scan(object):
 			#Is it an IP?
 			ip = ipa.ip_address(user_supplied)
 			if not (ip.is_multicast or ip.is_unspecified or ip.is_reserved or ip.is_loopback):
-				self.hosts.append(IP(ip))
+				print(type(ip))
+				self.hosts.append(IP(ip,from_net))
 				return
 			else:
 				self.bad_hosts.append(user_supplied)
@@ -131,10 +139,6 @@ class Scan(object):
 		except Exception as e:
 			#print(e)
 			pass
-		else:
-			#Check if it is not multicast IP
-			pass
-
 
 		try:
 			#Is it a valid network range?
@@ -142,20 +146,23 @@ class Scan(object):
 			#IP is acceptable as a network, but has num_addresses = 1
 			if net.num_addresses != 1:
 				for ip in net:
-					scan.add_host(ip)
+					scan.add_host(ip, True)
 				return
+			else:
+				self.bad_hosts.append(user_supplied)
 		except Exception as e:
 			#print(e)
 			pass
 
+
+		#TODO change this to, instead of resolving, verify characters
 		try:
 			#is it a valid DNS? Need to check against valid DNS characters
-			name = d.resolver.query(user_supplied)
+			name = dns.resolver.query(user_supplied)
 			self.hosts.append(Name(user_supplied))
-
 			return
 		except Exception as e:
-			print(e)
+			#print('Error with dns resolution') #seems like this library doesn't raise exceptions?
 			pass
 
 		self.bad_hosts.append(user_supplied)
@@ -166,11 +173,9 @@ class Scan(object):
 	def get_bad_hosts(self):
 		return self.bad_hosts
 
-	def start_scan(self):
+	def start_full_scan(self):
 		for host in self.hosts:
-			print('#### {} ####'.format(host.get_id()))
 			host.resolve()
-			print(host.get_results())
 
 
 
@@ -190,8 +195,18 @@ if __name__ == '__main__':
 
 	print('Not scanning', len(scan.get_bad_hosts()), 'hosts')
 	print('Scanning',len(scan.get_hosts()),'hosts')
-	#scan.start_scan()
+	print('Resolving, please wait')
 
-
+	scan.start_full_scan()
+	
+	for host in scan.hosts:
+		print('\n#### {} ####\n'.format(host.get_id()))
+		results = []
+		results = (host.get_results())
+		print('names:',results[0])
+		print('rev name:',results[1])
+		print('ip:',results[2])
+		print('whois_name:',results[3])
+		print('whois_ip:',results[4])
 
 
