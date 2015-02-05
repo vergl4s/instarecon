@@ -46,10 +46,18 @@ class Host(object):
 		try:
 			return socket.gethostbyaddr(str(self.ip))
 		except Exception as e:
-			raise e
+			#raise e
+			pass
 		
 
 	def get_whois_by_name(self):
+		'''Returns dict with the following keys:
+				contacts
+				emails
+				status
+				nameservers
+				raw
+		'''
 		try:
 			if self.names[0]:
 				return whois.get_whois(self.names[0])
@@ -57,6 +65,19 @@ class Host(object):
 			raise e
 
 	def get_whois_by_rev_name(self):
+		'''Returns dict with the following keys:
+				*nets
+				referral
+				raw
+				asn_registry
+				*asn_cidr
+				asn_date
+				query
+				asn_country_code
+				raw_referral
+				asn
+
+		'''
 		try:
 			return whois.get_whois(self.rev_name)
 		except Exception as e:
@@ -70,6 +91,15 @@ class Host(object):
 			except Exception as e:
 				raise e
 				pass
+
+	def get_geo(self):
+		#need to run the following two codes at the beginning of the script
+			#import pygeoip #http://pygeoip.readthedocs.org/en/v0.3.2/index.html# and http://tech.marksblogg.com/ip-address-lookups-in-python.html
+			#geo = pygeoip.GeoIP('/usr/share/GeoIP/GeoIP.dat')
+
+		#and then run
+		#print(geo.country_code_by_addr(self.ip))
+		pass
 
 
 class IP(Host):
@@ -102,7 +132,7 @@ class Name(Host):
 
 	def resolve(self):
 		self.ip = ipa.ip_address(self.get_host_by_name())
-		self.rev_name = self.get_host_by_addr()[0]
+		#self.rev_name = self.get_host_by_addr()[0]
 		self.whois_name = self.get_whois_by_ip()
 		self.whois_ip = self.get_whois_by_name()
 		pass
@@ -134,7 +164,7 @@ class Scan(object):
 				self.hosts.append(IP(ip,from_net))
 				return
 			else:
-				self.bad_hosts.append(user_supplied)
+					self.bad_hosts.append(user_supplied)
 				return
 		except Exception as e:
 			#print(e)
@@ -178,7 +208,6 @@ class Scan(object):
 			host.resolve()
 
 
-
 if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser(description='Reverse DNS lookup.')
@@ -193,9 +222,9 @@ if __name__ == '__main__':
 	for user_supplied in args.IP:
 		scan.add_host(user_supplied)
 
-	print('Not scanning', len(scan.get_bad_hosts()), 'hosts')
-	print('Scanning',len(scan.get_hosts()),'hosts')
-	print('Resolving, please wait')
+	print('[+] Not scanning', len(scan.get_bad_hosts()), 'hosts')
+	print('[+] Scanning',len(scan.get_hosts()),'hosts')
+	print('[+] Resolving, please wait')
 
 	scan.start_full_scan()
 	
