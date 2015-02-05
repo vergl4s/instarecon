@@ -1,4 +1,4 @@
-rev_dns
+IP scraper
 =======
 
-<s>~~Simple reverse dns lookup~~ IP scrapper</s> Tool tries to grab most OSINT on IP addresses and domain names.
+<s>Simple reverse dns lookup</s> Tool tries to grab most OSINT on IP addresses and domain names.
