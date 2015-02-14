@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 import sys, socket, argparse
 from abc import ABCMeta, abstractmethod
@@ -22,12 +22,10 @@ class Host(object):
         self.whois_name = []
         self.whois_ip = None
 
-
-
         #import pygeoip #http://pygeoip.readthedocs.org/en/v0.3.2/index.html# and http://tech.marksblogg.com/ip-address-lookups-in-python.html
         #geo = pygeoip.GeoIP('/usr/share/GeoIP/GeoIP.dat')
         #and then run
-        #print(geo.country_code_by_addr(self.ip))
+        #print geo.country_code_by_addr(self.ip)
 
     @abstractmethod
     def resolve(self):
@@ -77,7 +75,7 @@ class Host(object):
             pass
 
     def error(self, e, function_name):
-        print('[!] Error:', str(e),'| function name:',function_name)
+        print '[!] Error:', str(e),'| function name:',function_name
 
 class IP(Host):
     '''Host object created from user entry as IP address.'''
@@ -225,9 +223,10 @@ class Scan(object):
 
         host = None
 
+
         try:
             #Is it an IP?
-            ip = ipa.ip_address(user_supplied)
+            ip = ipa.ip_address(user_supplied.decode('unicode-escape'))
             if not (ip.is_multicast or ip.is_unspecified or ip.is_reserved or ip.is_loopback):
 
                 self.hosts.append(IP(ip,from_net))
@@ -236,12 +235,12 @@ class Scan(object):
                 self.bad_hosts.append(user_supplied)
                 return
         except Exception as e:
-            #print(e)
+            #print e
             pass
 
         try:
             #Is it a valid network range?
-            net = ipa.ip_network(user_supplied)
+            net = ipa.ip_network(user_supplied.decode('unicode-escape'))
             #IP is acceptable as a network, but has num_addresses = 1
             if net.num_addresses != 1:
                 for ip in net:
@@ -250,14 +249,14 @@ class Scan(object):
             else:
                 self.bad_hosts.append(user_supplied)
         except Exception as e:
-            #print(e)
+            #print e
             pass
 
 
         try:
             #is it a valid DNS?
-            name = dns.resolver.query(user_supplied)[0]
-            self.hosts.append(Name(user_supplied,str(name)))
+            ip = dns.resolver.query(user_supplied)[0]
+            self.hosts.append(Name(user_supplied,ipa.ip_address(str(ip).decode('unicode-escape'))))
             return
         except Exception as e:
             print('[!] Error: Couldn\'t resolve', user_supplied)
@@ -270,7 +269,7 @@ class Scan(object):
 
         if len(self.hosts)>0:
 
-            print('[+] Resolving, please wait')
+            print '[+] Resolving, please wait'
 
             #TODO threading
             for host in self.hosts:
@@ -284,25 +283,25 @@ class Scan(object):
                 #TODO IO semaphore
                 #TODO not print whois for 
                 if feedback:
-                    print('\n[+] #### {} ####\n'.format(host.get_id()))
+                    print '\n[+] #### {} ####\n'.format(host.get_id())
                     results = []
                     
                     if len(host.whois_name)>0:
-                        print('[+] names:',host.names[0])
+                        print '[+] names:',host.names[0]
                     else:
-                        print('[+] names: None')
+                        print '[+] names: None'
                     
-                    print('[+] rev name:',host.rev_name)
-                    print('[+] ip:',host.ip)
+                    print '[+] rev name:',host.rev_name
+                    print '[+] ip:',host.ip
                     
                     if len(host.whois_name)>0:
-                        print('[+] whois_name:',host.whois_name[0].get_results())
+                        print '[+] whois_name:',host.whois_name[0].get_results()
 
                     if host.whois_ip:
-                        print('[+] whois_ip:',host.whois_ip.get_results())
+                        print '[+] whois_ip:',host.whois_ip.get_results()
 
                     if host.rev_name and host.whois_rev_name:
-                        print('[+] whois_rev_name:',host.whois_rev_name.get_results())
+                        print '[+] whois_rev_name:',host.whois_rev_name.get_results()
 
             pass 
 
@@ -310,11 +309,11 @@ class Scan(object):
         #Tries to gather more information and make assumptions based 
         #on information grabbed by direct_scan
         
-        print ('\n[+] Doing reverse DNS lookup of related network range(s) -',', '.join(s for s in scan.cidrs),'- please wait')
+        print '\n[+] Doing reverse DNS lookup of related network range(s) -',', '.join(s for s in scan.cidrs),'- please wait'
 
         #TODO threading
         for cidr in self.cidrs:
-            net = ipa.ip_network(cidr)
+            net = ipa.ip_network(cidr.decode('unicode-escape'))
             for ip in net:
                 try:
 
@@ -325,7 +324,7 @@ class Scan(object):
                     
                     if feedback:
                         #TODO IO semaphore
-                        print(str(ip),rev)
+                        print str(ip),rev
 
                 except Exception as e:
                     pass
@@ -347,10 +346,10 @@ if __name__ == '__main__':
     
     scan.populate(targets)
 
-    print('[+] Scanning',str(len(scan.hosts))+'/'+str(len(targets)),'hosts')
+    print '[+] Scanning',str(len(scan.hosts))+'/'+str(len(targets)),'hosts'
     
     if len(scan.hosts)<1:
-        print('[+] No hosts to scan')
+        print '[+] No hosts to scan'
     else:
 
         scan.direct_scan(True)
