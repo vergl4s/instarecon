@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import sys, socket, argparse
 from abc import ABCMeta, abstractmethod
 import pythonwhois as whois #https://github.com/joepie91/python-whois
@@ -209,6 +210,12 @@ class Scan(object):
         self.secondary_scan_results['rev_lookups'] = {}
 
 
+    def populate(self, user_supplied_list):
+        for user_supplied in user_supplied_list:
+            self.add_host(user_supplied)
+
+        return len(self.hosts)
+
     def add_host(self, user_supplied, from_net=False):
 
         host = None
@@ -253,22 +260,50 @@ class Scan(object):
 
         self.bad_hosts.append(user_supplied)
 
-    def direct_scan(self):
+    def direct_scan(self, feedback=False):
         #Consists of DNS and whois lookups on the target hosts
 
-        #TODO threading
-        for host in self.hosts:
-            
-            host.resolve()
+        if len(self.hosts)>0:
 
-            if host.whois_ip.cidr:
-                self.cidrs.add(host.whois_ip.cidr)
-       
-        pass 
+            print('[+] Resolving, please wait')
 
-    def secondary_scan(self):
+            #TODO threading
+            for host in self.hosts:
+                
+                host.resolve()
+
+                if host.whois_ip.cidr:
+                    self.cidrs.add(host.whois_ip.cidr)
+
+                #TODO IO semaphore
+                if feedback:
+                    print('\n[+] #### {} ####\n'.format(host.get_id()))
+                    results = []
+                    
+                    if len(host.whois_name)>0:
+                        print('[+] names:',host.names[0])
+                    else:
+                        print('[+] names: None')
+                    
+                    print('[+] rev name:',host.rev_name)
+                    print('[+] ip:',host.ip)
+                    
+                    if len(host.whois_name)>0:
+                        print('[+] whois_name:',host.whois_name[0].get_results())
+
+                    if host.whois_ip:
+                        print('[+] whois_ip:',host.whois_ip.get_results())
+
+                    if host.rev_name and host.whois_rev_name:
+                        print('[+] whois_rev_name:',host.whois_rev_name.get_results())
+
+            pass 
+
+    def secondary_scan(self, feedback=False):
         #Tries to gather more information and make assumptions based 
         #on information grabbed by direct_scan
+        
+        print ('\n[+] Doing reverse DNS lookup of related network range(s) -',', '.join(s for s in scan.cidrs),'- please wait')
 
         #TODO threading
         for cidr in self.cidrs:
@@ -280,10 +315,13 @@ class Scan(object):
 
                     #TODO provide user feedback upon finding match
                     self.secondary_scan_results['rev_lookups'][str(ip)] = rev
+                    
+                    if feedback:
+                        #TODO IO semaphore
+                        print(str(ip),rev)
+
                 except Exception as e:
                     pass
-
-
 
 
 if __name__ == '__main__':
@@ -294,50 +332,24 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--server', metavar='server', required=False, nargs=1,type=str,help='DNS server to use')
     parser.add_argument('-t','--scan_type',metavar='scan_type',required=False,nargs=1,default=[1],help='Scan type. (1 - full (default) | 2 - simplified)')
     args = parser.parse_args()
-    args.targets = list(set(args.targets))
     
+    targets = list(set(args.targets))
+    scan_type = args.scan_type[0]
+
     scan = Scan(args.server)
     
-    for user_supplied in args.targets:
-        scan.add_host(user_supplied)
+    scan.populate(targets)
 
-    print('[+] Scanning',str(len(scan.hosts))+'/'+str(len(args.targets)),'hosts')
+    print('[+] Scanning',str(len(scan.hosts))+'/'+str(len(targets)),'hosts')
     
     if len(scan.hosts)<1:
         print('[+] No hosts to scan')
-
     else:
 
-        print('[+] Resolving, please wait')
+        scan.direct_scan(True)
 
-        scan.direct_scan()
-        
-        for host in scan.hosts:
-            print('\n[+] #### {} ####\n'.format(host.get_id()))
-            results = []
-            
-            if len(host.whois_name)>0:
-                print('[+] names:',host.names[0])
-            else:
-                print('[+] names: None')
-            
-            print('[+] rev name:',host.rev_name)
-            print('[+] ip:',host.ip)
-            
-            if len(host.whois_name)>0:
-                print('[+] whois_name:',host.whois_name[0].get_results())
+        if scan_type == 1:
+            scan.secondary_scan(True)
 
-            if host.whois_ip:
-                print('[+] whois_ip:',host.whois_ip.get_results())
-
-            if host.rev_name and host.whois_rev_name:
-                print('[+] whois_rev_name:',host.whois_rev_name.get_results())
-
-        
-        if args.scan_type[0] == 1:
-            print ('\n[+] Doing reverse DNS lookup of related network range(s) -',', '.join(s for s in scan.cidrs),'- please wait')
-            print('[+] No feedback in this section yet... you\'ll have to trust the scan is still running :)')
-            scan.secondary_scan()
-            for key, value in scan.secondary_scan_results['rev_lookups'].items():
-                print(key,value)
+                
 
