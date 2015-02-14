@@ -38,7 +38,7 @@ class Host(object):
         try:
             return str(dns.resolver.query(self.names[0])[0])
         except Exception as e:
-            self.error(e)
+            self.error(e,sys._getframe().f_code.co_name)
             pass
 
     def get_host_by_addr_socket(self):
@@ -46,14 +46,18 @@ class Host(object):
         try:
             return socket.gethostbyaddr(str(self.ip))
         except Exception as e:
-            self.error(e)
+            self.error(e,sys._getframe().f_code.co_name)
             pass
 
     def get_host_by_addr(self):
         try:
-            return ipw(str(self.ip)).get_host()[0]
+            #TODO 
+            if self.ip.is_private:
+                return self.get_host_by_addr_socket()
+            else:
+                return ipw(str(self.ip)).get_host()[0]
         except Exception as e:
-            self.error(e)
+            self.error(e,sys._getframe().f_code.co_name)
             pass        
 
     def get_whois_by_name(self,name=''):
@@ -61,18 +65,19 @@ class Host(object):
             if name:
                 return Whois(whois.get_whois(name))
         except Exception as e:
-            self.error(e)
+            self.error(e,sys._getframe().f_code.co_name)
             pass
 
     def get_whois_by_ip(self):
         try:
-            return WhoisIP(ipw(str(self.ip)).lookup())
+            if not self.ip.is_private:
+                return WhoisIP(ipw(str(self.ip)).lookup())
         except Exception as e:
-            self.error(e)
+            self.error(e,sys._getframe().f_code.co_name)
             pass
 
-    def error(self, e):
-        print('[!] Error:', str(e))
+    def error(self, e, function_name):
+        print('[!] Error:', str(e),'| function name:',function_name)
 
 class IP(Host):
     '''Host object created from user entry as IP address.'''
@@ -272,10 +277,12 @@ class Scan(object):
                 
                 host.resolve()
 
-                if host.whois_ip.cidr:
-                    self.cidrs.add(host.whois_ip.cidr)
+                if host.whois_ip:
+                    if host.whois_ip.cidr:
+                        self.cidrs.add(host.whois_ip.cidr)
 
                 #TODO IO semaphore
+                #TODO not print whois for 
                 if feedback:
                     print('\n[+] #### {} ####\n'.format(host.get_id()))
                     results = []
