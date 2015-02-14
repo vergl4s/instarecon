@@ -22,7 +22,8 @@ git clone https://github.com/vergl4s/ipscraper
 pip3 install -r ipscraper/requirements.txt 
 cp ipscraper/ipscraper.py /usr/bin/ 
 echo python3.3 /usr/bin/ipscraper.py > /usr/bin/ipscraper 
-chmod u+x /usr/bin/ipscraper```
+chmod u+x /usr/bin/ipscraper
+```
 
 ###Usage example
 ```bash
