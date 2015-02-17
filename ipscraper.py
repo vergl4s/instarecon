@@ -1,12 +1,11 @@
 #!/usr/bin/env python
-
 import sys, socket, argparse
 from abc import ABCMeta, abstractmethod
 import pythonwhois as whois #https://github.com/joepie91/python-whois
 from ipwhois import IPWhois as ipw #https://pypi.python.org/pypi/ipwhois
 import ipaddress as ipa #https://docs.python.org/3/library/ipaddress.html
 import dns.resolver #http://www.dnspython.org/docs/1.12.0/
-
+import thread
 
 
 class Host(object):
@@ -60,6 +59,8 @@ class Host(object):
 
     def get_whois_by_name(self,name=''):
         try:
+            #TODO check for empty response, return None instead
+            #TODO do whois with the parent domain, not with subdomain
             if name:
                 return Whois(whois.get_whois(name))
         except Exception as e:
@@ -68,6 +69,7 @@ class Host(object):
 
     def get_whois_by_ip(self):
         try:
+            #TODO check for empty response, return None instead
             if not self.ip.is_private:
                 return WhoisIP(ipw(str(self.ip)).lookup())
         except Exception as e:
@@ -110,6 +112,8 @@ class Name(Host):
     def resolve(self):
         #self.ip = ipa.ip_address(self.get_host_by_name())
 
+        #TODO enforce that self.name is root domain?
+
         self.rev_name = self.get_host_by_addr()
         
         self.whois_rev_name = self.get_whois_by_name(self.rev_name)
@@ -124,6 +128,7 @@ class Whois(object):
             raise ValueError('No raw whois to instantiate object.')
         
         try:
+            
             self.contacts = raw['contacts'] if 'contacts' in raw else None
             self.emails = raw['emails'] if 'emails' in raw else None
             self.status = raw['status'] if 'status' in raw else None
@@ -200,8 +205,8 @@ class Scan(object):
         #Just a set that keeps the original values passed by the user; used for a quick search
         self.targets = set()
 
-        #dictionary that'll keep all IPWhois results saved for future use
-        self.whois_ip_results = {}
+        # #dictionary that'll keep all IPWhois results saved for future use
+        # self.whois_ip_results = {}
 
         #CIDRs that were gathered by each IPWhois lookup, will be used by secondary_scan()
         self.cidrs = set()
@@ -213,11 +218,15 @@ class Scan(object):
         self.secondary_scan_results['rev_lookups'] = {}
 
 
-    def populate(self, user_supplied_list):
+    def populate(self, user_supplied_list, feedback=False):
         for user_supplied in user_supplied_list:
             self.add_host(user_supplied)
 
-        return len(self.hosts)
+        if feedback:
+            if len(scan.hosts)<1:
+                print '[+] No hosts to scan'
+            else:
+                print '[+] Scanning',str(len(self.hosts))+'/'+str(len(user_supplied_list)),'hosts'
 
     def add_host(self, user_supplied, from_net=False):
 
@@ -264,12 +273,13 @@ class Scan(object):
 
         self.bad_hosts.append(user_supplied)
 
+
     def direct_scan(self, feedback=False):
         #Consists of DNS and whois lookups on the target hosts
 
         if len(self.hosts)>0:
 
-            print '[+] Resolving, please wait'
+            if feedback: print '[+] Resolving, please wait'
 
             #TODO threading
             for host in self.hosts:
@@ -280,16 +290,12 @@ class Scan(object):
                     if host.whois_ip.cidr:
                         self.cidrs.add(host.whois_ip.cidr)
 
-                #TODO IO semaphore
-                #TODO not print whois for 
+                #TODO IO semaphore 
                 if feedback:
                     print '\n[+] #### {} ####\n'.format(host.get_id())
-                    results = []
-                    
-                    if len(host.whois_name)>0:
+                                
+                    if len(host.names)>0:
                         print '[+] names:',host.names[0]
-                    else:
-                        print '[+] names: None'
                     
                     print '[+] rev name:',host.rev_name
                     print '[+] ip:',host.ip
@@ -303,31 +309,30 @@ class Scan(object):
                     if host.rev_name and host.whois_rev_name:
                         print '[+] whois_rev_name:',host.whois_rev_name.get_results()
 
-            pass 
 
     def secondary_scan(self, feedback=False):
         #Tries to gather more information and make assumptions based 
         #on information grabbed by direct_scan
         
-        print '\n[+] Doing reverse DNS lookup of related network range(s) -',', '.join(s for s in scan.cidrs),'- please wait'
+        if self.cidrs:
 
-        #TODO threading
-        for cidr in self.cidrs:
-            net = ipa.ip_network(cidr.decode('unicode-escape'))
-            for ip in net:
-                try:
+            if feedback: print '\n[+] Doing reverse DNS lookup of related network range(s) -',', '.join(s for s in scan.cidrs),'- please wait'
 
-                    rev = ipw(ip).get_host()[0]
+            #TODO threading
+            for cidr in self.cidrs:
+                net = ipa.ip_network(cidr.decode('unicode-escape'))
+                for ip in net:
+                    try:
 
-                    #TODO provide user feedback upon finding match
-                    self.secondary_scan_results['rev_lookups'][str(ip)] = rev
-                    
-                    if feedback:
+                        rev = ipw(ip).get_host()[0]
+
+                        self.secondary_scan_results['rev_lookups'][str(ip)] = rev
+                        
                         #TODO IO semaphore
-                        print str(ip),rev
+                        if feedback: print str(ip),rev
 
-                except Exception as e:
-                    pass
+                    except Exception as e:
+                        pass
 
 
 if __name__ == '__main__':
@@ -338,24 +343,18 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--server', metavar='server', required=False, nargs=1,type=str,help='DNS server to use')
     parser.add_argument('-t','--scan_type',metavar='scan_type',required=False,nargs=1,default=[1],help='Scan type. (1 - full (default) | 2 - simplified)')
     args = parser.parse_args()
-    
+
     targets = list(set(args.targets))
     scan_type = args.scan_type[0]
 
     scan = Scan(args.server)
     
-    scan.populate(targets)
-
-    print '[+] Scanning',str(len(scan.hosts))+'/'+str(len(targets)),'hosts'
+    scan.populate(targets,feedback=True)
     
-    if len(scan.hosts)<1:
-        print '[+] No hosts to scan'
-    else:
+    scan.direct_scan(feedback=True)
 
-        scan.direct_scan(True)
-
-        if scan_type == 1:
-            scan.secondary_scan(True)
+    if scan_type == 1:
+        scan.secondary_scan(feedback=True)
 
                 
 
