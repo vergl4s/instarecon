@@ -1,11 +1,14 @@
 #!/usr/bin/env python
-import sys, socket, argparse
+import sys
+import socket
+import argparse
+import pprint
 from abc import ABCMeta, abstractmethod
-import pythonwhois as whois #https://github.com/joepie91/python-whois
+
+import pythonwhois as whois #http://cryto.net/pythonwhois/usage.html https://github.com/joepie91/python-whois
 from ipwhois import IPWhois as ipw #https://pypi.python.org/pypi/ipwhois
 import ipaddress as ipa #https://docs.python.org/3/library/ipaddress.html
 import dns.resolver #http://www.dnspython.org/docs/1.12.0/
-import thread
 
 
 class Host(object):
@@ -13,18 +16,12 @@ class Host(object):
     __metaclass__ = ABCMeta
 
     def __init__(self):
-
         self.ip = None
         self.names = []
         self.rev_name = None
-        self.whois_rev_name = None
-        self.whois_name = []
+        self.whois_name = {}
         self.whois_ip = None
 
-        #import pygeoip #http://pygeoip.readthedocs.org/en/v0.3.2/index.html# and http://tech.marksblogg.com/ip-address-lookups-in-python.html
-        #geo = pygeoip.GeoIP('/usr/share/GeoIP/GeoIP.dat')
-        #and then run
-        #print geo.country_code_by_addr(self.ip)
 
     @abstractmethod
     def resolve(self):
@@ -39,7 +36,6 @@ class Host(object):
             pass
 
     def get_host_by_addr_socket(self):
-        '''Return a triple (hostname, aliaslist, ipaddrlist) - https://docs.python.org/2/library/socket.html#socket.gethostbyaddr'''
         try:
             return socket.gethostbyaddr(str(self.ip))
         except Exception as e:
@@ -48,7 +44,6 @@ class Host(object):
 
     def get_host_by_addr(self):
         try:
-            #TODO 
             if self.ip.is_private:
                 return self.get_host_by_addr_socket()
             else:
@@ -57,21 +52,126 @@ class Host(object):
             self.error(e,sys._getframe().f_code.co_name)
             pass        
 
-    def get_whois_by_name(self,name=''):
+    def get_whois_name(self,name):
         try:
-            #TODO check for empty response, return None instead
             #TODO do whois with the parent domain, not with subdomain
             if name:
-                return Whois(whois.get_whois(name))
+                result_is_valid = False
+
+                #makes whois query
+                query = whois.get_whois(name)
+
+                #this section treats the results
+
+                result = {}
+
+                for key, value in query.iteritems():
+                    #Lists with strings
+                    if key in ['id','status','nameservers','emails','registrar','whois_server']:
+                        if value != None:
+                            result[key] = ','.join(value)
+                            result_is_valid = True
+
+
+                    elif key in ['updated_date','expiration_date','creation_date']:
+                        date = value[-1].strftime("%Y-%m-%d")
+                        result[key] = date
+                    
+                    #Dict with registrant, tech, admin and billing
+                    elif key in ['contacts']:
+                        new_dict = {}
+                        
+                        for key2, val2 in value.iteritems():
+                            if val2 != None:
+                                new_dict[key2] = val2
+                                result_is_valid = True
+
+                        result[key]= new_dict
+
+                if result_is_valid:
+                    return result
+                else:
+                    #TODO subdomain - if result is not valid, maybe we are trying to query a subdomain?
+                    pass
+                
         except Exception as e:
             self.error(e,sys._getframe().f_code.co_name)
             pass
 
-    def get_whois_by_ip(self):
+    def print_whois_name(self,num=0):
         try:
-            #TODO check for empty response, return None instead
+            result = ''
+            for key,val in self.whois_name[self.names[0]].iteritems():
+                #Improve, should print dicts right
+                if type(val) in [dict]:
+                    result = '\n\t'.join([result,key+': '+str(val)])
+                else:    
+                    result = '\n\t'.join([result,key+': '+val])
+            
+            return result
+
+        except Exception as e:
+            self.error(e,sys._getframe().f_code.co_name)
+            pass
+
+    def get_whois_ip(self):
+        try:
             if not self.ip.is_private:
-                return WhoisIP(ipw(str(self.ip)).lookup())
+                
+                raw_result = ipw(str(self.ip)).lookup()
+                
+                result = {}
+
+                if raw_result:
+
+                    result['net'] = raw_result['nets'][-1] if raw_result['nets'] else None
+                    result['parent_nets'] = raw_result['nets'][0:-1] if raw_result['nets'] else None
+
+                    for key,val in result['net'].iteritems():
+                        if key in ['address','description','tech_emails','abuse_emails',\
+                                    'cidr','country','state','city','created','handle',\
+                                    'misc_emails','name','postal_code','range']:
+                            if val:
+                                result['net_'+key] = result['net'][key].replace('\n',', ') if key in result['net'] and result['net'][key] else None
+
+
+                    for key,val in raw_result.iteritems():
+                        if key not in ['nets']:
+                            if type(val) in [dict]:
+
+                                new_dict = {}
+                                
+                                for key2, val2 in value.iteritems():
+                                    if val2 != None:
+                                        new_dict[key2] = val2
+                                        result_is_valid = True
+
+                                result[key] = new_dict
+
+                            elif type(val) in [list]:
+                                result[key] = raw_result[key] if raw_result[key] else None
+
+                            else:
+                                result[key] = raw_result[key].replace('\n',', ') if raw_result[key] else None
+
+                return result if result else None
+
+        except Exception as e:
+            self.error(e,sys._getframe().f_code.co_name)
+            pass
+
+    def print_whois_ip(self):
+        try:
+            result = ''
+            for key,val in self.whois_ip.iteritems():
+                if key not in ['net', 'query'] and val:
+                    if type(val) in [dict,list]:
+                        result = '\n\t'.join([result,key+': '+str(val)]) #Improve, should print dicts right
+                    else:    
+                        result = '\n\t'.join([result,key+': '+val])
+            
+            return result
+
         except Exception as e:
             self.error(e,sys._getframe().f_code.co_name)
             pass
@@ -87,13 +187,16 @@ class IP(Host):
         self.ip = user_supplied
         self.from_net = from_net
 
+    def __str__(self):
+        return str(self.ip)
+
     def get_id(self):
         return self.ip
 
     def resolve(self):
         self.rev_name = self.get_host_by_addr()
-        self.whois_rev_name = self.get_whois_by_name(self.rev_name)
-        self.whois_ip = self.get_whois_by_ip()
+        self.whois_rev_name = self.get_whois_name(self.rev_name)
+        self.whois_ip = self.get_whois_ip()
 
 
 class Name(Host):
@@ -106,86 +209,20 @@ class Name(Host):
         self.names.append(user_supplied)
         self.ip = ip_already_resolved
 
+    def __str__(self):
+        return str(self.names[0])
+
     def get_id(self):
         return self.names[0]
 
     def resolve(self):
         #self.ip = ipa.ip_address(self.get_host_by_name())
 
-        #TODO enforce that self.name is root domain?
-
         self.rev_name = self.get_host_by_addr()
         
-        self.whois_rev_name = self.get_whois_by_name(self.rev_name)
-        self.whois_name.append(self.get_whois_by_name(self.names[0]))
-        self.whois_ip = self.get_whois_by_ip()
-
-class Whois(object):
-    
-    def __init__(self,raw):
-        
-        if not raw:
-            raise ValueError('No raw whois to instantiate object.')
-        
-        try:
-            
-            self.contacts = raw['contacts'] if 'contacts' in raw else None
-            self.emails = raw['emails'] if 'emails' in raw else None
-            self.status = raw['status'] if 'status' in raw else None
-            self.nameservers = raw['nameservers'] if 'nameservers' in raw else None
-            self.raw = raw['raw'] if 'raw' in raw else None
-            self.registrar = raw['registrar'] if 'registrar' in raw else None
-            self.updated_date = raw['updated_date'] if 'updated_date' in raw else None
-            self.whois_server = raw['whois_server'] if 'whois_server' in raw else None
-        except Exception as e:
-            raise e
-
-    def get_results(self):
-        return '\n\tcontacts: {}\n\temails: {} \n\tnameservers: {} \n\tregistrar: {}'.format(self.contacts,self.emails,self.nameservers,self.registrar)
-
-
-class WhoisIP(object):
-
-    def __init__(self,raw):
-
-        if not raw or not raw['nets'][-1]:
-            raise ValueError('No raw whois to instantiate object.')
-
-        try:
-
-            self.net = raw['nets'][-1] if 'nets' in raw else None
-            if self.net:
-                self.parent_nets = raw['nets'][0:-1]            
-
-                #TODO abstract this shit
-                self.abuse_emails = self.net['abuse_emails'].replace('\n',', ') if 'abuse_emails' in self.net and self.net['abuse_emails'] else None                
-                self.address = self.net['address'].replace('\n',', ') if 'address' in self.net and self.net['address'] else None
-                self.description = self.net['description'].replace('\n',', ') if 'description' in self.net and self.net['description'] else None
-                self.tech_emails = self.net['tech_emails'].replace('\n',', ') if 'tech_emails' in self.net and self.net['tech_emails'] else None
-
-                self.cidr = self.net['cidr']
-                self.country = self.net['country']
-                self.state = self.net['state']
-                self.city = self.net['city']          
-                self.created = self.net['created']
-                self.handle = self.net['handle']
-                self.misc_emails = self.net['misc_emails']
-                self.name = self.net['name']
-                self.postal_code = self.net['postal_code']
-                self.range = self.net['range']
-
-        except Exception as e:
-            raise e
-
-    def get_results(self):
-        if self.net:
-            return '\n\tcidr: {}\n\trange: {}\n\tcountry: {}\n\tstate: {}\n\tcity: {}\n\taddress: {}\
-                        \n\tdescription: {}\n\tabuse_emails: {}\n\ttech_emails: {}'.format(self.cidr,\
-                        self.range,self.country, self.state,self.city,self.address,\
-                        self.description,self.abuse_emails,self.tech_emails)
-
-        else:
-            return None
+        #self.whois_rev_name = self.get_whois_name(self.rev_name)
+        self.whois_name[self.names[0]] = self.get_whois_name(self.names[0])
+        self.whois_ip = self.get_whois_ip()
 
 
 class Scan(object):
@@ -232,7 +269,6 @@ class Scan(object):
 
         host = None
 
-
         try:
             #Is it an IP?
             ip = ipa.ip_address(user_supplied.decode('unicode-escape'))
@@ -268,7 +304,7 @@ class Scan(object):
             self.hosts.append(Name(user_supplied,ipa.ip_address(str(ip).decode('unicode-escape'))))
             return
         except Exception as e:
-            print('[!] Error: Couldn\'t resolve', user_supplied)
+            print '[!] Error: Couldn\'t resolve', user_supplied
             pass
 
         self.bad_hosts.append(user_supplied)
@@ -287,11 +323,12 @@ class Scan(object):
                 host.resolve()
 
                 if host.whois_ip:
-                    if host.whois_ip.cidr:
-                        self.cidrs.add(host.whois_ip.cidr)
+                    if host.whois_ip['cidr']:
+                        self.cidrs.add(host.whois_ip['cidr'])
 
                 #TODO IO semaphore 
                 if feedback:
+                    pp =  pprint.PrettyPrinter()
                     print '\n[+] #### {} ####\n'.format(host.get_id())
                                 
                     if len(host.names)>0:
@@ -300,14 +337,11 @@ class Scan(object):
                     print '[+] rev name:',host.rev_name
                     print '[+] ip:',host.ip
                     
-                    if len(host.whois_name)>0:
-                        print '[+] whois_name:',host.whois_name[0].get_results()
+                    if host.whois_name[host.names[0]]:
+                        print '[+] whois_name:',host.print_whois_name()
 
                     if host.whois_ip:
-                        print '[+] whois_ip:',host.whois_ip.get_results()
-
-                    if host.rev_name and host.whois_rev_name:
-                        print '[+] whois_rev_name:',host.whois_rev_name.get_results()
+                        print '[+] whois_ip:',host.print_whois_ip()
 
 
     def secondary_scan(self, feedback=False):
@@ -350,7 +384,9 @@ if __name__ == '__main__':
     scan = Scan(args.server)
     
     scan.populate(targets,feedback=True)
-    
+    # for host in scan.hosts:
+    #     print host, str(host)
+
     scan.direct_scan(feedback=True)
 
     if scan_type == 1:
