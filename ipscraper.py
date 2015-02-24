@@ -245,7 +245,7 @@ class Scan(object):
         # #dictionary that'll keep all IPWhois results saved for future use
         # self.whois_ip_results = {}
 
-        #CIDRs that were gathered by each IPWhois lookup, will be used by secondary_scan()
+        #CIDRs that were gathered by each IPWhois lookup, will be used by mass_reverse_lookup()
         self.cidrs = set()
 
 
@@ -323,8 +323,8 @@ class Scan(object):
                 host.resolve()
 
                 if host.whois_ip:
-                    if host.whois_ip['cidr']:
-                        self.cidrs.add(host.whois_ip['cidr'])
+                    if host.whois_ip['net_cidr']:
+                        self.cidrs.add(host.whois_ip['net_cidr'])
 
                 #TODO IO semaphore 
                 if feedback:
@@ -344,7 +344,7 @@ class Scan(object):
                         print '[+] whois_ip:',host.print_whois_ip()
 
 
-    def secondary_scan(self, feedback=False):
+    def mass_reverse_lookup(self, feedback=False):
         #Tries to gather more information and make assumptions based 
         #on information grabbed by direct_scan
         
@@ -353,6 +353,7 @@ class Scan(object):
             if feedback: print '\n[+] Doing reverse DNS lookup of related network range(s) -',', '.join(s for s in scan.cidrs),'- please wait'
 
             #TODO threading
+            print self.cidrs
             for cidr in self.cidrs:
                 net = ipa.ip_network(cidr.decode('unicode-escape'))
                 for ip in net:
@@ -362,7 +363,7 @@ class Scan(object):
 
                         self.secondary_scan_results['rev_lookups'][str(ip)] = rev
                         
-                        #TODO IO semaphore
+                        #TODO IO semaphore (if threading works)
                         if feedback: print str(ip),rev
 
                     except Exception as e:
@@ -375,22 +376,19 @@ if __name__ == '__main__':
     parser.add_argument('targets', nargs='+', help='targets')
     #parser.add_argument('-o', '--output', metavar='output', required=False, nargs='?', help='Output filename')
     parser.add_argument('-s', '--server', metavar='server', required=False, nargs=1,type=str,help='DNS server to use')
-    parser.add_argument('-t','--scan_type',metavar='scan_type',required=False,nargs=1,default=[1],help='Scan type. (1 - full (default) | 2 - simplified)')
+    parser.add_argument('-t','--scan_type',metavar='scan_type',required=False,nargs=1,default='1',help='Scan type. (1 - full (default) | 2 - simplified)')
     args = parser.parse_args()
 
     targets = list(set(args.targets))
     scan_type = args.scan_type[0]
-
     scan = Scan(args.server)
     
     scan.populate(targets,feedback=True)
-    # for host in scan.hosts:
-    #     print host, str(host)
 
     scan.direct_scan(feedback=True)
 
-    if scan_type == 1:
-        scan.secondary_scan(feedback=True)
+    if scan_type == '1':
+        scan.mass_reverse_lookup(feedback=True)
 
                 
 
