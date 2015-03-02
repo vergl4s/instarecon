@@ -1,7 +1,12 @@
 argparse==1.2.1
+click==3.3
+colorama==0.3.3
 dnspython==1.12.0
 ipaddr==2.1.11
 ipaddress==1.0.7
 ipwhois==0.10.1
 pythonwhois==2.4.3
+requests==2.5.3
+shodan==1.2.6
+simplejson==3.6.5
 wsgiref==0.1.2
