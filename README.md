@@ -12,12 +12,13 @@ pip install -r requirements.txt
 ```
 or
 ```bash
-pip install pythonwhois ipwhois ipaddress
+pip install pythonwhois ipwhois ipaddress shodan
 ```
 
 
 
 ###Usage example
 ```bash
-ipscraper google.com 8.8.8.8 8.8.8.0/24
+ipscraper google.com 
+ipscraper 8.8.8.8
 ```
