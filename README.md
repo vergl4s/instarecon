@@ -14,7 +14,7 @@ InstaRecon will never scan a target directly. Information is retrieved from DNS/
 ###Installing on Kali Linux
 Simply install dependencies using pip.
 
-``bash
+```bash
 pip install -r requirements.txt
 ```
 or
