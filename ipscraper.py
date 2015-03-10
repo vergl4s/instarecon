@@ -297,28 +297,27 @@ class Host(object):
                            
                         if g_pathname: self.subdomains[g_host][g_protocol].add(g_pathname)
             
+            if len(self.domains)>0:
+                #Variable to check if there is any new result in the last iteration
+                subdomains_in_last_iteration = 0
+                #Google 'start from' parameter
+                counter = 0
+                #Google number of responses
+                num = 100
+                
+                google_lookup(self,num,counter)
 
-            #Variable to check if there is any new result in the last iteration
-            subdomains_in_last_iteration = 0
-            #Google 'start from' parameter
-            counter = 0
-            #Google number of responses
-            num = 100
-            
-            google_lookup(self,num,counter)
+                while len(self.subdomains) > subdomains_in_last_iteration:
+                                    
+                    subdomains_in_last_iteration = len(self.subdomains)
+                
+                    google_lookup(self,num,counter,True)
 
-            while len(self.subdomains) > subdomains_in_last_iteration:
-                                
-                subdomains_in_last_iteration = len(self.subdomains)
-            
+                counter = 100
                 google_lookup(self,num,counter,True)
 
-            counter = 100
-            google_lookup(self,num,counter,True)
-
-
         except Exception as e:
-            self.error(e,sys._getframe().f_code.co_name)        
+            self.error(e,sys._getframe().f_code.co_name)   
 
     def print_subdomains(self):
         try:
@@ -354,30 +353,40 @@ class Host(object):
 
 
     def get_specific_cidr(self):
-        if self.whois_ip:
-            cidrs = []
-            num_addresses = 0
-            specific_cidr = None
+        try:
+            if self.whois_ip:
+                cidrs = []
+                num_addresses = 0
+                specific_cidr = None
 
-            for key in ['asn_cidr','net0_cidr','net1_cidr','net2_cidr','net3_cidr']:
-                if key in self.whois_ip:
-                    cidrs.append(ipa.ip_network(self.whois_ip[key].decode('unicode-escape'))) 
+                for key in ['asn_cidr','net0_cidr','net1_cidr','net2_cidr','net3_cidr']:
+                    if key in self.whois_ip:
+                        
+                        #Internal try catch in case some of the CIDR fields is 'NA' (e.g. 7.7.7.7)
+                        try:
+                            cidrs.append(ipa.ip_network(self.whois_ip[key].decode('unicode-escape'))) 
+                        except Exception as e:
+                            
+                            pass
+                        
+                for cidr in cidrs:
+                    if (cidr.num_addresses < num_addresses) or (num_addresses == 0):
+                        specific_cidr = cidr
+                        num_addresses = cidr.num_addresses
 
-            for cidr in cidrs:
-                if (cidr.num_addresses < num_addresses) or (num_addresses == 0):
-                    specific_cidr = cidr
-                    num_addresses = cidr.num_addresses
+                    #for biggest cidr do
+                    #if (cidr.num_addresses > num_addresses):
+                self.cidr = specific_cidr   
 
-                #for biggest cidr do
-                #if (cidr.num_addresses > num_addresses):
-            self.cidr = specific_cidr
+        except Exception as e:
+            self.error(e,sys._getframe().f_code.co_name)  
+
+
 
     def error(self, e, function_name):
         if self.feedback:
             print '# Error:', str(e),'| function name:',function_name
 
-    def requests_header():
-        pass
 
     # def old_get_whois_domain(self,num=0):
     #     '''
@@ -501,7 +510,7 @@ class IP(Host):
         return str(self.ip)
 
     def get_id(self):
-        return self.ip
+        return str(self.ip)
 
     def resolve(self):
         self.get_rev_domain()
@@ -557,9 +566,6 @@ class Scan(object):
         self.bad_targets = []
         #Secondary targets, deducted from CIDRs and other relations
         self.secondary_targets = []
-
-        # #CIDRs that were gathered by each IPWhois lookup, will be used by scan_cidrs()
-        # self.cidrs = set()
 
 
     def populate(self, user_supplied_list):
@@ -685,8 +691,8 @@ class Scan(object):
         
                 if fb: 
                     print ''
-                    print '# Reverse DNS lookup on range ',host.cidr\
-                            ,'(taken from '+host.get_id()+')'
+                    print '# Reverse DNS lookup on range '+host.cidr\
+                            +' (taken from '+host.get_id()+')'
                 
                 #', '.join(str(s) for s in scan.cidrs)
 
@@ -703,7 +709,7 @@ class Scan(object):
                             if fb: print secondary_target.ip,secondary_target.rev_domain
 
                     except Exception as e:
-                        pass
+                        print 'kill received'
 
             if len(self.secondary_targets) <= 0:
                 if fb: print "# Done"
@@ -735,7 +741,6 @@ if __name__ == '__main__':
     
     #Other DNS entries eg MX etc
     #keyboard interrupt in secondary scan
-    
     #Output csv? xml? excel?
     #dns lookups on subdomains
     #What to do with pathname details from google? - too many results sometimes
@@ -744,7 +749,6 @@ if __name__ == '__main__':
 
 #Done
 
-    
     #Fix output line breaks
     #whois for co.nz
     #Only accept subdomains that end in the main domain
