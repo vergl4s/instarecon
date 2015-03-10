@@ -5,7 +5,7 @@ OSINT scraper that tries to gather information on IP addresses and domain names.
 
 
 ###Installing on Kali Linux
-~~This is an ugly workaround, because, for some reason, Kali decided to stay on python3.2~~. Decided to ditch python 3 and changed to code to python 2. Simply add dependencies using pip.
+Simply install dependencies using pip.
 
 ```bash
 pip install -r requirements.txt

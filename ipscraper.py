@@ -94,15 +94,12 @@ class Host(object):
             #makes whois query
             query = whois.get_whois(self.domains[num])
 
-
-            result = {}
+            result = {}  
             for key, value in query.iteritems():
                 #Lists with strings
                 if key in ['id','status','nameservers','emails','registrar','whois_server']:
                     if value != None:
-                        result[key] = ','.join(value)
                         result_is_valid = True
-
                 #Dates
                 elif key in ['updated_date','expiration_date','creation_date']:
                     date = value[-1].strftime("%Y-%m-%d")
@@ -110,32 +107,15 @@ class Host(object):
                 
                 #Dict with registrant, tech, admin and billing
                 elif key in ['contacts']:
-                    
-                    new_dict = {}
-                    
-                    #keys are tech, admin, billing and registrant
-                    #val are handle,name,organization,street,postalcode,city,state,country,email,phone,fax
                     for contact_key, contact_val in value.iteritems():
-                        
                         if contact_val != None:
-
-                            valid_contact_values = []
-                            #Not saving 'handle'
-                            for key3 in ['name','organization','street','postalcode','city','state','country','email','phone','fax']:
-                                if key3 in contact_val:
-                                    valid_contact_values.append(contact_val[key3])
-                            
-                            new_dict[contact_key] = ','.join(valid_contact_values)
-
                             result_is_valid = True
 
-                    result[key]= new_dict
+                elif key in ['raw']:
+                    result[key] = value
 
             if result_is_valid:
                 self.whois_domain[num] = result
-            else:
-                #If it is not valid, might be a subdomain
-                pass
                 
         except Exception as e:
             self.error(e,sys._getframe().f_code.co_name)
@@ -143,36 +123,14 @@ class Host(object):
 
     def print_whois_domain(self,num=0):
         try:
-            result = ''
             if self.whois_domain[num]:
-                w = self.whois_domain[num]
-
-                #if 'registrar' in 
-                
-                for key,val in self.whois_domain[num].iteritems():
-                    
-                    if key in ['contacts']:
-
-                        # result = '\n'.join([result,'{}: '.format(key)])
-
-                        for key2,val2 in val.iteritems():
-                            result = '\n'.join([
-                                result,
-                                '{}: {}'.format('contact_'+key2,val2),
-                                ])
-                    else:
-                        result = '\n'.join([
-                            result,
-                            '{}: {}'.format(key,str(val))
-                            ])
-                
-                return result.lstrip().rstrip()
-
+                if 'raw' in self.whois_domain[num] and len(self.whois_domain[num])>1:
+                    return self.whois_domain[num]['raw'][0].lstrip().rstrip()
+            return ''
         except Exception as e:
             self.error(e,sys._getframe().f_code.co_name)
-            pass
 
-
+        
     def get_whois_ip(self):
         try:
             if not self.ip.is_private:
@@ -291,7 +249,7 @@ class Host(object):
                 if sleep_before: time.sleep(randint(0,4)+randint(0,1000)*0.001)
 
                 subdomains_to_remove = list(self.subdomains.keys())
-                request = 'https://google.com/search?hl=en&meta=&num='+str(num)+'&start='+str(counter)+'&q='
+                request = 'http://google.com/search?hl=en&meta=&num='+str(num)+'&start='+str(counter)+'&q='
                 request = ''.join([request,'site%3A',self.domains[0]])
 
                 for subdomain in self.subdomains.keys():
@@ -300,12 +258,7 @@ class Host(object):
                         request = ''.join([request,'%20%2Dsite%3A',subdomain])
 
 
-                headers = {
-                    #IE10 user agent :)
-                    'User-Agent':'Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)'
-                }
-
-                google_search = requests.get(request)#,headers=headers)
+                google_search = requests.get(request)
                 #print request,'\n',google_search
 
 
@@ -376,7 +329,7 @@ class Host(object):
             return result.lstrip().rstrip()
 
         except Exception as e:
-            self.error(e,sys._getframe().f_code.co_name)          
+            self.error(e,sys._getframe().f_code.co_name)
 
     def print_subdomains_verbose(self):
         try:
@@ -419,10 +372,110 @@ class Host(object):
                 #if (cidr.num_addresses > num_addresses):
             self.cidr = specific_cidr
 
-
     def error(self, e, function_name):
         if self.feedback:
             print '# Error:', str(e),'| function name:',function_name
+
+    def requests_header():
+        pass
+
+    # def old_get_whois_domain(self,num=0):
+    #     '''
+    #         Deprecated function. I gave up on trying to catalog the whois results.
+    #         There are discrepancies in field names between top-level domains.
+    #         As an example, fields names are slightly different between
+    #         google.com, google.com.au, and google.co.nz even though values are the same
+    #     '''
+
+    #     #http://cryto.net/pythonwhois/usage.html for fields
+
+    #     try:
+    #         result_is_valid = False
+
+    #         #makes whois query
+    #         query = whois.get_whois(self.domains[num])
+
+
+    #         result = {}
+    #         for key, value in query.iteritems():
+    #             #Lists with strings
+    #             if key in ['id','status','nameservers','emails','registrar','whois_server']:
+    #                 if value != None:
+    #                     result[key] = ','.join(value)
+    #                     result_is_valid = True
+
+    #             #Dates
+    #             elif key in ['updated_date','expiration_date','creation_date']:
+    #                 date = value[-1].strftime("%Y-%m-%d")
+    #                 result[key] = date
+                
+    #             #Dict with registrant, tech, admin and billing
+    #             elif key in ['contacts']:
+                    
+    #                 new_dict = {}
+                    
+    #                 #keys are tech, admin, billing and registrant
+    #                 #val are handle,name,organization,street,postalcode,city,state,country,email,phone,fax
+    #                 for contact_key, contact_val in value.iteritems():
+                        
+    #                     if contact_val != None:
+
+    #                         valid_contact_values = []
+    #                         #Not saving 'handle'
+    #                         for key3 in ['name','organization','street','postalcode','city','state','country','email','phone','fax']:
+    #                             if key3 in contact_val:
+    #                                 valid_contact_values.append(contact_val[key3])
+                            
+    #                         new_dict[contact_key] = ','.join(valid_contact_values)
+
+    #                         result_is_valid = True
+
+    #                 result[key]= new_dict
+
+    #             elif key in ['raw']:
+    #                 result[key] = value
+
+    #         if result_is_valid:
+    #             self.whois_domain[num] = result
+    #         else:
+    #             #If it is not valid, might be a subdomain
+    #             pass
+                
+    #     except Exception as e:
+    #         self.error(e,sys._getframe().f_code.co_name)
+    #         pass
+
+    # def old_print_whois_domain(self,num=0):
+    #     '''Deprecacted function'''
+    #     try:
+    #         result = ''
+    #         if self.whois_domain[num]:
+    #             w = self.whois_domain[num]
+
+    #             #if 'registrar' in 
+                
+    #             for key,val in self.whois_domain[num].iteritems():
+                    
+    #                 if key in ['contacts']:
+
+    #                     # result = '\n'.join([result,'{}: '.format(key)])
+
+    #                     for key2,val2 in val.iteritems():
+    #                         result = '\n'.join([
+    #                             result,
+    #                             '{}: {}'.format('contact_'+key2,val2),
+    #                             ])
+    #                 else:
+    #                     result = '\n'.join([
+    #                         result,raw
+    #                         '{}: {}'.format(key,str(val))
+    #                         ])
+                
+    #             return result.lstrip().rstrip()
+
+    #     except Exception as e:
+    #         self.error(e,sys._getframe().f_code.co_name)
+    #         pass
 
 
 class IP(Host):
@@ -576,53 +629,50 @@ class Scan(object):
 
             for host in self.targets:
                 
+                if fb: print '\n____________________ Scanning {} ____________________\n'.format(host.get_id())
+            
 
             ###DNS and Whois lookups###
-                if fb:
-                    print '\n____________________ Scanning {} ____________________\n'.format(host.get_id())
-                    print '# Doing DNS/Whois lookups'
+                if fb: print '# Doing DNS/Whois lookups'
 
                 host.resolve()
 
-                #If whois_ip is valid, record CIDR in Scan object for future use
-                #if host.whois_ip: self.cidrs.add(host.get_specific_cidr())
-                
                 if fb:  
-                    if len(host.domains)>0:
-                        print '[-] Domain: '+host.domains[0]
-                    
-                    print '[-] IP: '+str(host.ip)
-
+                    if len(host.domains)>0:print '[-] Domain: '+host.domains[0]
+                    if host.ip: print '[-] IP: '+str(host.ip)
                     if host.rev_domain: print '[-] Reverse domain: '+host.rev_domain
 
-                    if host.whois_domain:
-                        if host.whois_domain[0]:
-                            print '[-] Whois domain:'+'\n'+host.print_whois_domain()+'\n'
+                    print ''
+
+                    if len(host.whois_domain)>0:
+                        print '[-] Whois domain:'+'\n'+host.print_whois_domain()+''
                     else:
                         print '# No domain whois. Maybe you\'re scanning a subdomain?'
 
                     if host.whois_ip:
-                        print '[-] Whois IP:'+'\n'+host.print_whois_ip()+'\n'
+                        print ''
+                        print '[-] Whois IP:'+'\n'+host.print_whois_ip()
                     
 
             #Shodan lookup
                 if self.shodan_key:
+                    print ''
                     if fb: print '# Querying Shodan for open ports'
                     host.get_shodan(self.shodan_key)
-                if fb:
-                    if host.shodan:
-                        print '[-] Shodan:'+'\n'+host.print_shodan()
+                    if fb and host.shodan: print '[-] Shodan:'+'\n'+host.print_shodan()
 
 
             #Google subdomains lookup
-                if fb: print '\n# Querying Google for subdomains, this might take a while'
+                if fb:
+                    print '' 
+                    print '# Querying Google for subdomains, this might take a while'
                 host.get_subdomains_from_google()
-
                 if fb:
                     if host.subdomains:
-                        print '[-] Subdomains:'+'\n'+host.print_subdomains()+'\n'
+                        print '[-] Subdomains:'+'\n'+host.print_subdomains()
                     if host.linkedin_page:
-                        print '[-] Possible LinkedIn page: '+host.linkedin_page+'\n'                      
+                        print ''
+                        print '[-] Possible LinkedIn page: '+host.linkedin_page                     
 
 
     def scan_cidrs(self):
@@ -633,14 +683,15 @@ class Scan(object):
 
             for host in self.targets:
         
-                if fb: print '# Reverse DNS lookup on range ',host.cidr\
+                if fb: 
+                    print ''
+                    print '# Reverse DNS lookup on range ',host.cidr\
                             ,'(taken from '+host.get_id()+')'
                 
                 #', '.join(str(s) for s in scan.cidrs)
 
                 for ip in host.cidr:
                     try:
-
                         secondary_target = IP(ip,feedback=False)
                         secondary_target.get_rev_domain()
                                                 
@@ -655,7 +706,7 @@ class Scan(object):
                         pass
 
             if len(self.secondary_targets) <= 0:
-                if fb: print "# No related targets found."
+                if fb: print "# Done"
 
 
 if __name__ == '__main__':
@@ -677,23 +728,26 @@ if __name__ == '__main__':
 
     if args.aggr == '1':
         #dns lookups on entire CIDRs that contain original targets
-        scan.scan_cidrs() 
+        scan.scan_cidrs()
 
 
 #TODO
     
-    #improve printing whois domain results
     #Other DNS entries eg MX etc
     #keyboard interrupt in secondary scan
     
-    #User-agent on google lookup
-    #Style line that says ### Scanning target ###
     #Output csv? xml? excel?
     #dns lookups on subdomains
-    #What to do with subdomain details from google? - too many results sometimes
-    #granularity on scans
+    #What to do with pathname details from google? - too many results sometimes
+    #granularity on scan types
+    
 
 #Done
-    #Fix output indentation
+
+    
+    #Fix output line breaks
+    #whois for co.nz
     #Only accept subdomains that end in the main domain
     #Secondary scan output - say which target CIDR relates to
+    #Style line that says ### Scanning target ###
+    #improve printing whois domain results - using raw only
