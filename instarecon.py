@@ -250,7 +250,6 @@ class Host(object):
         try:
             def google_lookup(self,num,counter,sleep_before=False):
 
-
                 #Sleep some time between 0 - 4.999 seconds - maybe fools google?
                 if sleep_before: time.sleep(randint(0,4)+randint(0,1000)*0.001)
 
@@ -266,7 +265,6 @@ class Host(object):
 
                 google_search = requests.get(request)
                 #print request,'\n',google_search
-
 
                 google_results = re.findall('<cite>(.+?)<\/cite>', google_search.text)
 
@@ -748,6 +746,7 @@ if __name__ == '__main__':
     #Not print whois lines that don't have : (test with various domains before implementing this)
     #Other DNS entries eg MX etc
     #keyboard interrupt in secondary scan
+    #save google results as Hosts within hosts, create field for pathnames
     #Output csv? xml? excel?
     #dns lookups on google subdomains
     #What to do with pathname details from google? - too many results sometimes
