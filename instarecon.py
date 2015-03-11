@@ -112,7 +112,13 @@ class Host(object):
                             result_is_valid = True
 
                 elif key in ['raw']:
-                    result[key] = value
+                    raw = []
+
+                    for line in value[0].split('\n'):
+                        if ': ' in line or ':\t' in line:
+                            raw.append(line)
+                    if len(raw)>0:
+                        result[key] = '\n'.join(raw)
 
             if result_is_valid:
                 self.whois_domain[num] = result
@@ -125,7 +131,7 @@ class Host(object):
         try:
             if self.whois_domain[num]:
                 if 'raw' in self.whois_domain[num] and len(self.whois_domain[num])>1:
-                    return self.whois_domain[num]['raw'][0].lstrip().rstrip()
+                    return self.whois_domain[num]['raw']
             return ''
         except Exception as e:
             self.error(e,sys._getframe().f_code.co_name)
@@ -250,7 +256,7 @@ class Host(object):
 
                 subdomains_to_remove = list(self.subdomains.keys())
                 request = 'http://google.com/search?hl=en&meta=&num='+str(num)+'&start='+str(counter)+'&q='
-                request = ''.join([request,'site%3A',self.domains[0]])
+                request = ''.join([request,'site%3A%2A',self.domains[0]])
 
                 for subdomain in self.subdomains.keys():
                     #Don't want to remove original name from google query
@@ -533,7 +539,7 @@ class Name(Host):
         return str(self.domains[0])
 
     def get_id(self):
-        return self.domains[0]
+        return str(self.domains[0])
 
     def resolve(self):
         self.get_ip()
@@ -691,7 +697,7 @@ class Scan(object):
         
                 if fb: 
                     print ''
-                    print '# Reverse DNS lookup on range '+host.cidr\
+                    print '# Reverse DNS lookup on range '+str(host.cidr)\
                             +' (taken from '+host.get_id()+')'
                 
                 #', '.join(str(s) for s in scan.cidrs)
@@ -717,7 +723,7 @@ class Scan(object):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description='IP OSINT scraper')
+    parser = argparse.ArgumentParser(description='InstaRecon')
     parser.add_argument('targets', nargs='+', help='targets')
     parser.add_argument('-d', '--dns_server', metavar='dns_server', required=False, nargs='?',help='DNS server to use')
     parser.add_argument('-a','--aggr',metavar='aggressiveness',required=False,nargs='?',default='1',help='1 - aggressive (default) | 2 - simplified')
@@ -738,11 +744,12 @@ if __name__ == '__main__':
 
 
 #TODO
-    
+    #site:*.github.com
+    #Not print whois lines that don't have : (test with various domains before implementing this)
     #Other DNS entries eg MX etc
     #keyboard interrupt in secondary scan
     #Output csv? xml? excel?
-    #dns lookups on subdomains
+    #dns lookups on google subdomains
     #What to do with pathname details from google? - too many results sometimes
     #granularity on scan types
     
