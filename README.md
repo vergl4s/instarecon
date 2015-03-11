@@ -6,10 +6,10 @@ Automated basic digital reconnaissance. Great for getting an initial footprint o
 * Direct and reverse DNS lookups
 * Domain and IP Whois lookups
 * Google dorks to get subdomains that relate to a target
-* [Shodan](https://www.shodan.io/]) lookups
+* [Shodan](https://www.shodan.io/) lookups
 * Reverse DNS lookups on CIDRs related to targets
 
-InstaRecon will never scan a target directly. Information is retrieved from DNS/Whois servers, Google, and [Shodan](https://www.shodan.io/]).
+InstaRecon will never scan a target directly. Information is retrieved from DNS/Whois servers, Google, and [Shodan](https://www.shodan.io/).
 
 ###Installing on Kali Linux
 Simply install dependencies using pip.
