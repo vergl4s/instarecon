@@ -3,7 +3,7 @@ import sys
 import socket
 import argparse
 import requests
-from abc import ABCMeta, abstractmethod
+#from abc import ABCMeta, abstractmethod
 import re
 import time
 from random import randint
@@ -16,51 +16,89 @@ import shodan #https://shodan.readthedocs.org/en/latest/index.html
 
 
 class Host(object):
-    'Abstract class for Host being scanned. IP and Name classes inherit from this.'
-    __metaclass__ = ABCMeta
+    '''
+    Host being scanned. 
+    Contains several IP and Domain objects.
+    '''
 
-    def __init__(self, feedback=True):
+    def __init__(self,domain=None,ips=[],feedback=True):
+        
+        if ips and domain: #target is domain, but ip was already resolved by scan.add_host()
+            self.type = 'domain'
+        elif ips: #target is ip
+            self.type = 'ip'
+        elif domain: #target is domain
+            self.type = 'domain'
+        else:
+            raise ValueError
 
         self.feedback = feedback
+
+        #Single domain
+        self.domain = domain
         
-        #Domains
-        self.domains = []
+        #Multiple IPs
+        self.ips = [ ip for ip in ips ] # if isinstance(user_supplied,ipa.IPv4Address):
 
-        #IPs
-        self.ips = []
+        #Subdomains, found through google dorks and reverse cidr lookups
+        #Contains multiple Domains
+        self.subdomains = {} #TODO change to list of domains
+
+
+
+        #WILL REMOVE THE FOLLOWING 
         
-        #Reverse domains for each IP in self.ips
-        #key - IP | value - list of reverse domains
-        self.rev_domains = {}
-
-        #MX records - email servers
-        #key - domain | value - list of ips
-        self.mx = {}
-
-        #NS records - DNS servers
-        #key - domain | value - list of ips
-        self.ns = {}
-
-
-        #Whois results for names
-        self.whois_domain = None
         #Whois results for self.ips
         self.whois_ip = None
         #CIDR retrieved from whois_ip in get_specific_cidr()
         self.cidr = None
-        
+        #Reverse domains for each IP in self.ips
+        #key - IP | value - list of reverse domains
+        self.rev_domains = {}
+
         #Shodan lookup for self.ip
         self.shodan = None
+
+        #MX records - email servers
+        #key - domain | value - list of ips
+        self.mx = {}
+        #NS records - DNS servers
+        #key - domain | value - list of ips
+        self.ns = {}
+
+        #Whois results for names
+        self.whois_domain = None
+
 
         #Company LinkedIn page
         self.linkedin_page = None
 
-        #Subdomains, found through google dorks
-        #Keys are subdomains
-        #values are dicts with protocol keys and pathname values
-        self.subdomains = {}
+    def __str__(self):
+        if self.type == 'domain':
+            return str(self.domain)
+        elif self.type == 'ip':
+            return str(self.ips[0])
 
+    def dns_lookups(self):
+        if self.type == 'domain':
+            self.get_ips()
+            self.get_rev_domains()
+
+        if self.type == 'ip':
+            self.get_rev_domains()
+        
+        return self
     
+    def whois_lookups(self):
+        if self.type == 'domain':
+            self.get_whois_domain()
+            self.get_whois_ip()
+
+        if self.type == 'ip':
+            self.get_whois_ip()
+            
+        return self
+
     def error(self, e, function_name):
         if self.feedback:
             print '# Error:', str(e),'| function name:',function_name
@@ -86,20 +124,22 @@ class Host(object):
 
     def get_ips(self):
         try:
-            if self.domains[0] and not self.ips:
-                ips = self._ret_host_by_name(self.domains[0])
+            if self.domain and not self.ips:
+                ips = self._ret_host_by_name(self.domain)
                 self.ips = [ ipa.ip_address(str(ip).decode('unicode-escape')) for ip in ips ]
         except Exception as e:
-            self.error('Host lookup failed for '+self.domains[0],sys._getframe().f_code.co_name)
+            self.error('Host lookup failed for '+self.domain,sys._getframe().f_code.co_name)
             pass        
 
     def get_rev_domains(self):
         try:
             if self.ips:
                 for ip in self.ips:
+                    rev_domains = ''
                     try:
                         rev_domains = self._ret_host_by_ip(str(ip))
                     except Exception, e:
+                        #TODO only print if verbosity is set
                         self.error('Host lookup failed for '+ip,sys._getframe().f_code.co_name)
 
                     if rev_domains:
@@ -113,28 +153,28 @@ class Host(object):
 
     def get_mx_records(self):
         try:
-            if self.domains[0]:
-                mx_list = self._ret_mx_by_name(self.domains[0])
+            if self.domain:
+                mx_list = self._ret_mx_by_name(self.domain)
                 for mx in mx_list:
                     self.mx.setdefault(mx,[str(d) for d in self._ret_host_by_name(mx)])
         except Exception, e:
-            self.error('MX lookup failed for '+str(self.domains[0]),sys._getframe().f_code.co_name)
+            self.error('MX lookup failed for '+str(self.domain),sys._getframe().f_code.co_name)
 
     def get_ns_records(self):
         try:
-            if self.domains[0]:
-                ns_list = self._ret_ns_by_name(self.domains[0])
+            if self.domain:
+                ns_list = self._ret_ns_by_name(self.domain)
                 for ns in ns_list:
                     self.ns.setdefault(ns,[str(d) for d in self._ret_host_by_name(ns)])
         except Exception, e:
             #raise e
-            self.error('NS lookup failed for '+str(self.domains[0]),sys._getframe().f_code.co_name)
+            self.error('NS lookup failed for '+str(self.domain),sys._getframe().f_code.co_name)
 
 
     def get_whois_domain(self,num=0):
         try:
-            if self.domains[num]:
-                query = whois.get_whois(self.domains[num])
+            if self.domain:
+                query = whois.get_whois(self.domain)
                 
                 if 'raw' in query:
                     self.whois_domain = query['raw'][0].lstrip().rstrip()
@@ -145,43 +185,41 @@ class Host(object):
         
     def get_whois_ip(self):
         try:
-            if not self.ips[0].is_private:
-                raw_result = ipw(str(self.ips[0])).lookup()
-                
-                result = {}
+            raw_result = ipw(str(self.ips[0])).lookup()
+            
+            result = {}
 
-                if raw_result:
+            if raw_result:
+                if raw_result['nets']:
+                    #get results from parent 'nets'
+                    for index,net in enumerate(raw_result['nets']):
+                        for key,val in net.iteritems():
+                            if val:
+                                result['net'+str(index)+'_'+key] = net[key].replace('\n',', ') \
+                                    if key in net and net[key] else None
 
-                    if raw_result['nets']:
-                        #get results from parent 'nets'
-                        for index,net in enumerate(raw_result['nets']):
-                            for key,val in net.iteritems():
-                                if val:
-                                    result['net'+str(index)+'_'+key] = net[key].replace('\n',', ') \
-                                        if key in net and net[key] else None
+                #get all remaining results not in 'nets'
+                for key,val in raw_result.iteritems():
+                    if key not in ['nets','query']:
+                        if type(val) in [dict]:
 
-                    #get all remaining results not in 'nets'
-                    for key,val in raw_result.iteritems():
-                        if key not in ['nets','query']:
-                            if type(val) in [dict]:
-
-                                new_dict = {}
-                                
-                                for key2, val2 in value.iteritems():
-                                    if val2 != None:
-                                        new_dict[key2] = val2
-                                        result_is_valid = True
-
-                                result[key] = new_dict
-
-                            else:
-                                if raw_result[key]:
-                                    result[key] = str(raw_result[key]).replace('\n',', ')
+                            new_dict = {}
+                            
+                            for key2, val2 in value.iteritems():
+                                if val2 != None:
+                                    new_dict[key2] = val2
                                     result_is_valid = True
 
-                self.whois_ip = result
-                #Get CIDR from whois_ip and save on self.cidr
-                self.get_specific_cidr()
+                            result[key] = new_dict
+
+                        else:
+                            if raw_result[key]:
+                                result[key] = str(raw_result[key]).replace('\n',', ')
+                                result_is_valid = True
+
+            self.whois_ip = result
+            #Get CIDR from whois_ip and save on self.cidr
+            self.get_specific_cidr()
 
         except Exception as e:
             self.error(e,sys._getframe().f_code.co_name)
@@ -262,11 +300,11 @@ class Host(object):
 
         subdomains_to_remove = list(self.subdomains.keys())
         request = 'http://google.com/search?hl=en&meta=&num='+str(num)+'&start='+str(counter)+'&q='
-        request = ''.join([request,'site%3A%2A',self.domains[0]])
+        request = ''.join([request,'site%3A%2A',self.domain])
 
         for subdomain in self.subdomains.keys():
             #Don't want to remove original name from google query
-            if subdomain != self.domains[0]:
+            if subdomain != self.domain:
                 request = ''.join([request,'%20%2Dsite%3A',subdomain])
 
 
@@ -298,7 +336,7 @@ class Host(object):
 
 
             #if domain in subdomain (to make sure it is a subdomain)
-            if self.domains[0] in g_host:
+            if self.domain in g_host:
 
                 if g_host not in self.subdomains:
                     self.subdomains[g_host] = {}
@@ -311,10 +349,10 @@ class Host(object):
 
     def google_lookups(self):
         try:
-            if len(self.domains)>0:
+            if len(self.domain)>0:
 
                 #Get Linkedin page
-                self.linkedin_page = self._get_linkedin_page(self.domains[0])
+                self.linkedin_page = self._get_linkedin_page(self.domain)
 
                 #Variable to check if there is any new result in the last iteration
                 subdomains_in_last_iteration = 0
@@ -400,86 +438,47 @@ class Host(object):
             self.error(e,sys._getframe().f_code.co_name)
 
 
-class Entry(object):
-    '''
-    Using this class instead of a dict with keys domain/ip/reverse_domain. 
-    Used to keep track of a single domain/ip entry.
-    A Host contains several of these.'''
-
-    def __init__(self, ip=None,rev_domain=None):
-        #Only one for each instance
-        self.ip = ip
-        #Only one for each instance
-        self.domain = domain
-        #Can be multiple
-        self.rev_domain = rev_domain
-
-
-
 
 class IP(Host):
-    '''Host object created from user entry as IP address.'''
+    '''
 
-    def __init__(self, user_supplied, from_net=False, name=None,feedback=True):
-        Host.__init__(self,feedback)
+    '''
+    def __init__(self,ip):
 
-        #If user_supplied was already converted into IP
-        if isinstance(user_supplied,ipa.IPv4Address):
-            self.ips.append(user_supplied)
-        else:
-            #user_supplied is string
-            self.ips.append(ipa.ip_address(user_supplied.decode('unicode-escape')))
+        #Whois results for self.ips
+        self.whois_ip = None
+        #CIDR retrieved from whois_ip in get_specific_cidr()
+        self.cidr = None
+        #Reverse domains for each IP in self.ips
+        #key - IP | value - list of reverse domains
+        self.rev_domains = {}
 
-        #will be none if not provided
-        self.name = name
-        
-        # #flag to separate ip derived from netrange - not used for anything so far
-        # self.from_net = from_net
+        #Shodan lookup for self.ip
+        self.shodan = None
 
-    def __str__(self):
-        return str(self.ips[0])
 
-    def get_id(self):
-        return str(self.ips[0])
-    
-    def dns_lookups(self):
-        self.get_rev_domains()
-        return self
+class Domain(Host):
+    '''
 
-    def whois_lookups(self):
-        self.get_whois_ip()
-        return self
+    '''
 
-class Name(Host):
-    '''Host object created from user entry as name.'''
+    def __init__(self,domain):
 
-    def __init__(self, user_supplied, ips_already_resolved=None,feedback=True):
-        #ip_already_resolved is gathered in Scan.add_host() when checking for valid domains
-        #is passed to this __init__ because there is no reason to make the same request twice
-        Host.__init__(self,feedback)
+        self.domain = domain
 
-        self.domains.append(user_supplied)
+        #MX records - email servers
+        #key - domain | value - list of ips
+        self.mx = {}
+        #NS records - DNS servers
+        #key - domain | value - list of ips
+        self.ns = {}
 
-        if ips_already_resolved: 
-            for ip in ips_already_resolved:
-                self.ips.append(ipa.ip_address(str(ip).decode('unicode-escape')))
-        else: 
-            self.get_ips()
+        #Whois results for names
+        self.whois_domain = None
 
-    def __str__(self):
-        return str(self.domains[0])
 
-    def get_id(self):
-        return str(self.domains[0])
-
-    def dns_lookups(self):
-        self.get_rev_domains()
-        return self
-
-    def whois_lookups(self):
-        self.get_whois_domain()
-        self.get_whois_ip()
-        return self
+        #Company LinkedIn page
+        self.linkedin_page = None
 
 
 class Scan(object):
@@ -530,8 +529,7 @@ class Scan(object):
         try:
             ip = ipa.ip_address(user_supplied.decode('unicode-escape'))
             if not (ip.is_multicast or ip.is_unspecified or ip.is_reserved or ip.is_loopback):
-
-                self.targets.append(IP(ip,from_net))
+                self.targets.append(Host(ips=[str(ip)]))
                 return
             else:
                 self.bad_targets.append(user_supplied)
@@ -542,24 +540,29 @@ class Scan(object):
 
         #is it a valid network range?
         try:
-            net = ipa.ip_network(user_supplied.decode('unicode-escape'))
-            
-            for ip in net:
-                self.add_host(str(ip), True)
-            return
-            
+            net = ipa.ip_network(user_supplied.decode('unicode-escape'),strict=False)
+            if net.prefixlen < 16:
+                print '# Error: Not a good idea to scan anything bigger than a /16 is it?', user_supplied
+            else:
+                for ip in net:
+                    self.add_host(str(ip), True)
+                return
+                
         except Exception as e:
-            #print e
+            #print e,type(e)
             pass
 
         #is it a valid DNS?
         try:
+            pass
+            domain = user_supplied
             ips = dns.resolver.query(user_supplied)
-            self.targets.append(Name(user_supplied,ips))
+            self.targets.append(Host(domain=domain,ips=[str(ip) for ip in ips]))
             return
         except Exception as e:
+            #If here so results from network won't be so verbose
             if not from_net:
-                print '# Error: Couldn\'t resolve', user_supplied
+                print '# Error: Couldn\'t resolve or understand', user_supplied
             pass
 
         self.bad_targets.append(user_supplied)
@@ -572,17 +575,17 @@ class Scan(object):
 
             for host in self.targets:
                 
-                if fb: print '\n____________________ Scanning {} ____________________\n'.format(host.get_id())
+                if fb: print '\n____________________ Scanning {} ____________________\n'.format(str(host))
             
 
             ###DNS and Whois lookups###
                 if fb: print '# Doing DNS/Whois lookups'
 
                 host.dns_lookups()
-                if fb:  
-                    if len(host.domains)>0:
+                if fb:
+                    if host.domain:
                         print ''
-                        print '[*] Domain: '+host.domains[0]
+                        print '[*] Domain: '+host.domain
                     
                     #IPs and reverse domains
                     if host.ips: 
@@ -639,7 +642,7 @@ class Scan(object):
 
 
             #Google subdomains lookup
-                if host.domains:
+                if host.domain:
                     if fb:
                         print '' 
                         print '# Querying Google for subdomains and Linkedin pages, this might take a while'
@@ -666,7 +669,7 @@ class Scan(object):
                 if fb:
                     print ''
                     print '# Reverse DNS lookup on range '+str(host.cidr)\
-                            +' (taken from '+host.get_id()+')'
+                            +' (taken from '+str(host)+')'
                 
                 for ip in host.cidr:
                     secondary_target = IP(ip,feedback=False)
@@ -691,8 +694,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     targets = list(set(args.targets)) #removes duplicates
-
-    scan = Scan(dns_server=args.dns_server,shodan_key=args.shodan_key,feedback=True) #instantiate Scan
+    
+    #instantiate Scan
+    scan = Scan(
+        dns_server=args.dns_server,
+        shodan_key=args.shodan_key,
+        feedback=True
+        ) 
     
     scan.populate(targets) #populate Scan with targets
 
@@ -715,4 +723,8 @@ if __name__ == '__main__':
     #Output csv?
     
     #What to do with pathname details from google? - too many results sometimes
+
+    #verbosity flag to print all errors
+
+    #granularity in scanning - #recude verbosity when doing only reverse lookups
     
