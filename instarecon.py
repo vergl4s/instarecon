@@ -164,7 +164,7 @@ class Host(object):
 
     def _subdomains_google_lookup(self,num,counter,sleep_before=False):
 
-        #Sleep some time between 0 - 2.999 seconds - maybe fools google?
+        #Sleep some time between 0 - 2.999 seconds
         if sleep_before: time.sleep(randint(0,2)+randint(0,1000)*0.001)
 
         subdomains_to_remove = list(self.subdomains.keys())
@@ -591,7 +591,7 @@ class Scan(object):
             
 
             ###DNS and Whois lookups###
-                if fb: print '# Doing DNS/Whois lookups'
+                if fb: print '# DNS lookups'
                 host.dns_lookups()
                 if fb:
                     if host.domain:
@@ -621,6 +621,8 @@ class Scan(object):
                     print host.print_all_mx()
 
 
+                if fb: print '# Whois lookups'
+
                 host.get_whois_domain()
                 if host.whois_domain and fb:
                     print '' 
@@ -637,9 +639,13 @@ class Scan(object):
 
             #Shodan lookup
                 if self.shodan_key:
-                    print ''
-                    if fb: print '# Querying Shodan for open ports'
+                    
+                    if fb: 
+                        print ''
+                        print '# Querying Shodan for open ports'
+
                     host.get_all_shodan(self.shodan_key)
+
                     if fb:
                         m = host.print_all_shodan()
                         if m:
@@ -707,14 +713,14 @@ if __name__ == '__main__':
         dns_server=args.dns_server,
         shodan_key=args.shodan_key,
         feedback=True,
-        verbose=True# TODO change to args.verbose
+        verbose=args.verbose# TODO change to args.verbose
         )
     
     scan.populate(targets) #populate Scan with targets
 
-    scan.scan_targets() #whois/dns/shodan lookups on targets
+    scan.scan_targets()
 
-    #scan.scan_cidrs() #dns lookups on entire CIDRs that contain original targets
+    scan.scan_cidrs() #dns lookups on entire CIDRs that contain original targets
     
 
 
