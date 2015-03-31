@@ -11,7 +11,7 @@ from random import randint
 import pythonwhois as whois #http://cryto.net/pythonwhois/usage.html https://github.com/joepie91/python-whois
 from ipwhois import IPWhois as ipw #https://pypi.python.org/pypi/ipwhois
 import ipaddress as ipa #https://docs.python.org/3/library/ipaddress.html
-import dns.resolver,dns.reversename #http://www.dnspython.org/docs/1.12.0/
+import dns.resolver,dns.reversename,dns.name #http://www.dnspython.org/docs/1.12.0/
 import shodan #https://shodan.readthedocs.org/en/latest/index.html
 
 
@@ -52,7 +52,7 @@ class Host(object):
 
         #Subdomains, found through google dorks and reverse cidr lookups
         #list of Hosts instances
-        self.subdomains = []
+        self.subdomains = set()
 
         #Contains strings taken from google
         self.pathnames = {}
@@ -63,11 +63,24 @@ class Host(object):
             return str(self.domain)
         elif self.type == 'ip':
             return str(self.ips[0])
+    
+    def __hash__(self):
+        if self.type == 'domain':
+            return hash(('domain',self.domain))
+        elif self.type == 'ip':
+            return hash(('ip',self.ips))
+    
+    def __eq__(self,other):
+        if self.type == 'domain':
+            return self.domain == other.domain
+        elif self.type == 'ip':
+            return self.ips == other.ips
 
     def get_ips(self):
-            if self.domain and not self.ips:
-                ips = self._ret_host_by_name(self.domain)
-                self.ips = [ IP(str(ip)) for ip in ips ]
+        if self.domain and not self.ips:
+            ips = self._ret_host_by_name(self.domain)
+            self.ips = [ IP(str(ip)) for ip in ips ]
+        return self
 
     def dns_lookups(self):
         if self.type == 'domain':
@@ -167,23 +180,26 @@ class Host(object):
         #Sleep some time between 0 - 2.999 seconds
         if sleep_before: time.sleep(randint(0,2)+randint(0,1000)*0.001)
 
-        subdomains_to_remove = list(self.subdomains.keys())
+        subdomains_to_remove = self.subdomains
         request = 'http://google.com/search?hl=en&meta=&num='+str(num)+'&start='+str(counter)+'&q='
         request = ''.join([request,'site%3A%2A',self.domain])
 
-        for subdomain in self.subdomains.keys():
+        for subdomain in self.subdomains:
             #Don't want to remove original name from google query
             if subdomain != self.domain:
-                request = ''.join([request,'%20%2Dsite%3A',subdomain])
+                request = ''.join([request,'%20%2Dsite%3A',str(subdomain)])
 
-
-        google_search = requests.get(request)
-        #print request,'\n',google_search
+        try:
+            google_search = requests.get(request)
+        except Exception as e:
+            Scan.error(e,sys._getframe().f_code.co_name)
 
         google_results = re.findall('<cite>(.+?)<\/cite>', google_search.text)
 
+        domain = dns.name.from_text(self.domain)
 
-        for url in google_results:
+
+        for url in set(google_results):
             g_host = url
             g_protocol = ''
             g_pathname = ''
@@ -204,44 +220,48 @@ class Host(object):
                 g_host = temp[0]
 
 
-            #if domain in subdomain (to make sure it is a subdomain)
-            if self.domain in g_host:
+            #Currently not using protocol or pathname for anything
+            try:
+                g_domain = dns.name.from_text(g_host)
+                if g_domain.is_subdomain(domain):
+                    self.subdomains.add(Host(domain=g_host).dns_lookups())
 
-                if g_host not in self.subdomains:
-                    self.subdomains[g_host] = {}
-                    self.subdomains[g_host][g_protocol] = set()
+
+
+                # if g_host not in self.subdomains:
+                #     self.subdomains[g_host] = {}
+                #     self.subdomains[g_host][g_protocol] = set()
                 
-                if g_protocol not in self.subdomains[g_host]:
-                    self.subdomains[g_host][g_protocol] = set()
+                # if g_protocol not in self.subdomains[g_host]:
+                #     self.subdomains[g_host][g_protocol] = set()
                    
-                if g_pathname: self.subdomains[g_host][g_protocol].add(g_pathname)
+                # if g_pathname: self.subdomains[g_host][g_protocol].add(g_pathname)
+            except Exception as e:
+                Scan.error(e,sys._getframe().f_code.co_name)
+
 
     def google_lookups(self):
-        try:
-            if self.domain:
+        if self.domain:
 
-                #Get Linkedin page
-                self.linkedin_page = self._get_linkedin_page(self.domain)
+            #Get Linkedin page
+            self.linkedin_page = self._get_linkedin_page(self.domain)
 
-                #Variable to check if there is any new result in the last iteration
-                subdomains_in_last_iteration = -1
-                #Google 'start from' parameter
-                counter = 0
-                #Google number of responses
-                num = 100
-                
-                while len(self.subdomains) > subdomains_in_last_iteration:
-                                    
-                    subdomains_in_last_iteration = len(self.subdomains)
-                
-                    self._subdomains_google_lookup(num,counter,True)
-
-                counter = 100
+            #Variable to check if there is any new result in the last iteration
+            subdomains_in_last_iteration = -1
+            #Google 'start from' parameter
+            counter = 0
+            #Google number of responses
+            num = 100
+            
+            while len(self.subdomains) > subdomains_in_last_iteration:
+                                
+                subdomains_in_last_iteration = len(self.subdomains)
+            
                 self._subdomains_google_lookup(num,counter,True)
 
-        except Exception as e:
-            Scan.error(e,sys._getframe().f_code.co_name)
-   
+            counter = 100
+            self._subdomains_google_lookup(num,counter,True)
+
 
     def print_all_ips(self):
         ret = ''
@@ -621,7 +641,9 @@ class Scan(object):
                     print host.print_all_mx()
 
 
-                if fb: print '# Whois lookups'
+                if fb: 
+                    print ''
+                    print '# Whois lookups'
 
                 host.get_whois_domain()
                 if host.whois_domain and fb:
@@ -713,14 +735,14 @@ if __name__ == '__main__':
         dns_server=args.dns_server,
         shodan_key=args.shodan_key,
         feedback=True,
-        verbose=args.verbose# TODO change to args.verbose
+        verbose=True# TODO change to args.verbose
         )
     
     scan.populate(targets) #populate Scan with targets
 
     scan.scan_targets()
 
-    scan.scan_cidrs() #dns lookups on entire CIDRs that contain original targets
+    #scan.scan_cidrs() #dns lookups on entire CIDRs that contain original targets
     
 
 
@@ -728,8 +750,8 @@ if __name__ == '__main__':
     
     #save google results as Hosts within hosts, create field for pathnames
     
-    #dns lookups on google subdomains
-    
+    #test whois_ip performance
+
     #keyboard interrupt in secondary scan
     
     #index whois_ip results so won't have to repeat the same request (host should have cidr as list?)
