@@ -834,12 +834,10 @@ class Scan(object):
                     
                     host.reverse_dns_lookup_on_related_cidrs(feedback=True)
                     
-            if fb: print "# Done"
 
     def write_output_csv(self, filename=None):
         if filename:
             filename = os.path.expanduser(filename)
-            print filename
             fb = self.feedback
 
             if fb: 
