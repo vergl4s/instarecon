@@ -4,15 +4,16 @@ InstaRecon
 Automated basic digital reconnaissance. Great for getting an initial footprint of your targets.
 
 * Direct and reverse DNS lookups
+* MX and NS lookups
 * Domain and IP Whois lookups
-* Google dorks to get subdomains that relate to a target
+* Google queries to get subdomains
 * [Shodan](https://www.shodan.io/) lookups
-* Reverse DNS lookups on CIDRs related to targets
+* Reverse DNS lookups on entire CIDRs looking for subdomains
 
 InstaRecon will never scan a target directly. Information is retrieved from DNS/Whois servers, Google, and [Shodan](https://www.shodan.io/).
 
-###Installing on Kali Linux
-Simply install dependencies using pip.
+###Installing with pip
+Simply install dependencies using pip. Tested on Ubuntu 14.04 and Kali Linux 1.1.0a.
 
 ```bash
 pip install -r requirements.txt
@@ -123,7 +124,7 @@ DNSSEC: unsigned
 URL of the ICANN WHOIS Data Problem Reporting System: http://wdprs.internic.net/
 >>> Last update of WHOIS database: 2015-04-09T20:41:54-0700 <<<
 
-The Data in MarkMonitor.com's WHOIS database is provided by MarkMonitor.com for
+The Data in MarkMonitor.com\'s WHOIS database is provided by MarkMonitor.com for
 information purposes, and to assist persons in obtaining information about or
 related to a domain name registration record.  MarkMonitor.com does not guarantee
 its accuracy.  By submitting a WHOIS query, you agree that you will use this Data
