@@ -24,8 +24,9 @@ pip install pythonwhois ipwhois ipaddress shodan
 
 ###Example
 ```bash
+$ ./instarecon.py -s <shodan_key> -o ~/Desktop/github.csv github.com
 # Scanning 1/1 hosts
-# Shodan key provided - lIfnmamhMngr61fd5DkW0a82RyyMQzY3
+# Shodan key provided - <shodan_key>
 
 # ____________________ Scanning github.com ____________________ #
 
