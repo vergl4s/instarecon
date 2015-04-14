@@ -39,8 +39,14 @@ class Host(object):
 
     '''
 
-    def __init__(self,domain=None,ips=[],reverse_domains=[]):
+    def __init__(self,domain=None,ips=None,reverse_domains=None):
         
+        #Default values here instead of as pararmeters default value because lists are mutable objects
+        #http://effbot.org/zone/default-values.htm
+        if ips is None: ips = []
+        if reverse_domains is None: reverse_domains = []
+
+        #Type check - depends on what parameters have been passed
         if ips and domain or domain: #target is domain, with or without ip already resolved by scan.add_host()
             self.type = 'domain'
         elif ips: #target is ip
@@ -322,9 +328,10 @@ class Host(object):
         return subdomains_discovered
 
 
-    def _add_to_subdomains_if_valid(self,subdomains_as_str=[],subdomains_as_hosts=[]):
+    def _add_to_subdomains_if_valid(self,subdomains_as_str=None,subdomains_as_hosts=None):
         '''
         Will add Hosts from subdomains_as_str or subdomains_as_hosts to self.subdomain if indeed these hosts are subdomains
+        subdomains_as_hosts and subdomains_as_str should be iterable list or set
         '''
         if subdomains_as_str:
             self.subdomains.update(
@@ -540,7 +547,10 @@ class IP(Host):
             shodan - Dict containing Shodan results
     '''
 
-    def __init__(self,ip,rev_domains=[]):
+    def __init__(self,ip,rev_domains=None):
+
+        if rev_domains is None: rev_domains = []
+        
         self.ip = str(ip)
         self.rev_domains = rev_domains
         self.whois_ip = {}
