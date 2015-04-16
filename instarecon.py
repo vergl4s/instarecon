@@ -39,15 +39,9 @@ class Host(object):
 
     '''
 
-    def __init__(self,domain=None,ips=None,reverse_domains=None):
-        
-        #Default values here instead of as pararmeters default value because lists are mutable objects
-        #http://effbot.org/zone/default-values.htm
-        if ips is None: ips = []
-        if reverse_domains is None: reverse_domains = []
-
+    def __init__(self,domain=None,ips=(),reverse_domains=()):
         #Type check - depends on what parameters have been passed
-        if ips and domain or domain: #target is domain, with or without ip already resolved by scan.add_host()
+        if domain: #target is domain, with or without ip already resolved by scan.add_host()
             self.type = 'domain'
         elif ips: #target is ip
             self.type = 'ip'
