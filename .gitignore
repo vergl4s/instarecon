@@ -1,4 +1,4 @@
-test.py
+tmp.py
 *.pyc
 venv/*
 env/*
