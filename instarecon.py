@@ -196,7 +196,7 @@ class Host(object):
     @staticmethod
     def _ret_host_by_name(name):
         try:
-            return dns.resolver.query(name)
+            return Scan.dns_resolver.query(name)
         except Exception as e:
             Scan.error('[-] Host lookup failed for '+name,sys._getframe().f_code.co_name)
             pass
@@ -205,7 +205,7 @@ class Host(object):
     def _ret_mx_by_name(name):
         try:
             #rdata.exchange for domains and rdata.preference for integer
-            return [str(mx.exchange).rstrip('.') for mx in dns.resolver.query(name,'MX')]
+            return [str(mx.exchange).rstrip('.') for mx in Scan.dns_resolver.query(name,'MX')]
         except Exception as e:
             Scan.error('[-] MX lookup failed for '+name,sys._getframe().f_code.co_name)
             pass
@@ -214,7 +214,7 @@ class Host(object):
     def _ret_ns_by_name(name):
         try:
             #rdata.exchange for domains and rdata.preference for integer
-            return [str(ns).rstrip('.') for ns in dns.resolver.query(name,'NS')]
+            return [str(ns).rstrip('.') for ns in Scan.dns_resolver.query(name,'NS')]
         except Exception as e:
             Scan.error('[-] NS lookup failed for '+name,sys._getframe().f_code.co_name)
             pass
@@ -385,7 +385,7 @@ class Host(object):
                 reverse_lookup = None
 
                 try:
-                    reverse_lookup = dns.resolver.query(dns.reversename.from_address(str(ip)),'PTR')
+                    reverse_lookup = Scan.dns_resolver.query(dns.reversename.from_address(str(ip)),'PTR')
                 except Exception as e:
                     pass
                 except KeyboardInterrupt:
@@ -394,7 +394,7 @@ class Host(object):
                         break
                     else:
                         try:
-                            reverse_lookup = dns.resolver.query(dns.reversename.from_address(str(ip)),'PTR')
+                            reverse_lookup = Scan.dns_resolver.query(dns.reversename.from_address(str(ip)),'PTR')
                         except Exception as e:
                             pass
 
@@ -563,7 +563,7 @@ class IP(Host):
     @staticmethod
     def _ret_host_by_ip(ip):
         try:
-            return dns.resolver.query(dns.reversename.from_address(ip),'PTR')
+            return Scan.dns_resolver.query(dns.reversename.from_address(ip),'PTR')
         except Exception as e:
             Scan.error('[-] Host lookup failed for '+ip,sys._getframe().f_code.co_name)
 
@@ -673,12 +673,13 @@ class Scan(object):
 
     feedback = False
     verbose = False
+    dns_resolver = dns.resolver.Resolver()
 
     def __init__(self,dns_server=None,shodan_key=None,feedback=False,verbose=False):
 
         Scan.feedback = feedback
         Scan.verbose=verbose
-        self.dns_server = dns_server
+        if dns_server: Scan.dns_resolver.nameservers = [dns_server]
         self.shodan_key = shodan_key
         self.targets = set()
         self.bad_targets = set()
@@ -687,7 +688,6 @@ class Scan(object):
     def error(e, method_name=None):
         if Scan.feedback and Scan.verbose: 
             print '# Error:', str(e),'| method:',method_name
-
 
     def populate(self, user_supplied_list):
         for user_supplied in user_supplied_list:
@@ -740,7 +740,7 @@ class Scan(object):
         try:
             pass
             domain = user_supplied
-            ips = dns.resolver.query(user_supplied)
+            ips = Scan.dns_resolver.query(user_supplied)
             self.targets.add(Host(domain=domain,ips=[str(ip) for ip in ips]))
             return
         except Exception as e:
