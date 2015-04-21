@@ -35,8 +35,8 @@ class Host(object):
         whois_domain - str representation of the Whois query
         subdomains - Set of Hosts for each related Host found that is a subdomain of self.domain
         linkedin_page - Str of LinkedIn url that contains domain in html
-        related_hosts - Set of Hosts that may be related to self. Taken from 
-
+        related_hosts - Set of Hosts that may be related to host, as they're part of the same cidrs
+        cidrs - set of strs for each ip.cidr 
     '''
 
     def __init__(self,domain=None,ips=(),reverse_domains=()):
@@ -54,8 +54,9 @@ class Host(object):
         self.ns = set()
         self.whois_domain = None
         self.subdomains = set()
+        self.linkedin_page = None
         self.related_hosts = set()
-        self.linkedin_page = None        
+        self.cidrs = set()
 
     def __str__(self):
         if self.type == 'domain':
@@ -166,6 +167,8 @@ class Host(object):
             if not cidr_found:
                 ip.get_whois_ip()
                 cidrs_found[ip.cidr] = ip.whois_ip
+
+        self.cidrs = set([ip.cidr for ip in self.ips])
 
     def get_all_shodan(self,key):
         '''
@@ -368,11 +371,7 @@ class Host(object):
         Does reverse dns lookups in all cidrs discovered that are related to this host
         Will be used to check for subdomains found through reverse lookup
         '''
-
-        cidrs = set([ ip.cidr for ip in self.ips ])
-
-        #Reverse DNS lookup on all self.cidrs
-        for cidr in cidrs:
+        for cidr in self.cidrs:
             #For each ip in network cidr
             for ip in ipa.ip_network(cidr.decode('unicode-escape')):
                 
@@ -606,7 +605,7 @@ class IP(Host):
             result = ''
             #Printing all lines except 'nets'
             for key,val in sorted(self.whois_ip.iteritems()):
-                if val and key not in ['nets']:
+                if val and key not in ['nets','query']:
                     result = '\n'.join([result,key+': '+str(val)])
             #Printing each dict within 'nets'
             for key,val in enumerate(self.whois_ip['nets']):
@@ -631,12 +630,10 @@ class IP(Host):
             if len(self.shodan['data']) > 0:
                 for item in self.shodan['data']:
                     result = ''.join([
-                        
                         result,
                         'Port: {}'.format(item['port']),
                         '\n',
                         'Banner: {}'.format(item['data'].replace('\n','\n\t').rstrip()),
-
                         ])
 
             return result.rstrip().lstrip()
@@ -644,7 +641,6 @@ class IP(Host):
 class Scan(object):
     '''
     Object that will hold all Host entries, interpret uset given flags, manage scans, threads and outputs.
-
 
     Attributes are:
         feedback - Bool flag for output printing. Static variable.
@@ -654,7 +650,6 @@ class Scan(object):
         targets - Set of Hosts that will be scanned
         target_networks - Set of ipaddress.IPv4Networks to be scanned
         bad_targets - Set of user inputs that could not be understood or resolved
-
     '''
 
     feedback = False
@@ -735,12 +730,8 @@ class Scan(object):
         for host in self.targets:
             self.full_scan_on_host(host)
 
-        for host in self.targets:
-            self.scan_related_cidrs(host)
-
-
     def full_scan_on_host(self,host):
-        '''Does all scans for each host in self.targets'''
+        '''Does all possible scans for each host in self.targets'''
         fb = self.feedback
             
         if fb: 
@@ -829,15 +820,12 @@ class Scan(object):
                     print '[*] Subdomains:'+'\n'+host.print_subdomains()
                 else:
                     print '[-] Error: No subdomains found in Google. If you are scanning a lot, Google might be blocking your requests.'
-
-    def scan_related_cidrs(self,host):
-        '''DNS lookups on entire CIDRs taken from host.get_whois_ip()'''
-        fb = self.feedback        
-        cidrs = set([ip.cidr for ip in host.ips])
-        if cidrs:
+        
+        #DNS lookups on entire CIDRs taken from host.get_whois_ip()
+        if host.cidrs:
             if fb:
                 print ''
-                print '# Reverse DNS lookup on range(s) {} (related to {})'.format(', '.join(cidrs),str(host))
+                print '# Reverse DNS lookup on range(s) {}'.format(', '.join(host.cidrs))
             host.reverse_dns_lookup_on_related_cidrs(feedback=True)
                 
     def write_output_csv(self, filename=None):
@@ -850,7 +838,6 @@ class Scan(object):
                 print '' 
                 print '# Saving output csv file'
 
-            
             output_as_lines = []
 
             for host in self.targets:
@@ -862,7 +849,6 @@ class Scan(object):
                 except StopIteration:
                     pass
                 
-
             output_written = False
             while not output_written:
                 
