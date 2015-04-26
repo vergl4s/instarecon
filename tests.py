@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 import unittest
-
+from instarecon import *
+import ipaddress as ipa
 class TestHostMethods(unittest.TestCase):
-
-    def setUp(self):
-        self.host = Host('google.com') 
-                
+    
+    def test_network(self):
+        net = ipa.ip_network(u'8.8.8.0/26',strict=False)
+        network = Network([net])
+        network.reverse_lookup_on_related_cidrs(True)
+    
     # def test_upper(self):
     #     self.assertEqual('foo'.upper(), 'FOO')
 
