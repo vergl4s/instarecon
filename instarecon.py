@@ -777,7 +777,7 @@ class Scan(object):
             return
         except (dns.resolver.NXDOMAIN, dns.exception.SyntaxError) as e:
             #If here so results from network won't be so verbose
-            if Scan.feedback: print '[-] Couldn\'t resolve or understand', user_supplied
+            if Scan.feedback: print '[-] Couldn\'t resolve or understand -', user_supplied
             pass
 
         self.bad_targets.add(user_supplied)
@@ -951,23 +951,13 @@ class Scan(object):
                     if raw_input('[-] Sure you want to exit without saving your file (Y/n)?') in ['y','Y','']:
                         sys.exit('# Scan interrupted')
 
-    @staticmethod    
-    def entry_banner():
-        if Scan.feedback:
-            return '\n'.join([
-                '',
-                '# InstaRecon - basic automated digital reconnaissance - by Luis Teixeira',
-                '',
-            ])
 
-    @staticmethod
-    def exit_banner():
-        if Scan.feedback:
-            return '# Done'
+    entry_banner = 'InstaRecon v0.1 - by Luis Teixeira (teix.co)'
+    exit_banner = '# Done'
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='# InstaRecon - basic automated digital reconnaissance - by Luis Teixeira',
+        description=Scan.entry_banner,
         usage='%(prog)s [options] target1 [target2 ... targetN]',
         epilog=argparse.SUPPRESS,
         )
@@ -990,11 +980,11 @@ if __name__ == '__main__':
         )
     
     try:
-        print scan.entry_banner()
+        print scan.entry_banner
         scan.populate(targets)
         scan.scan_targets()
         scan.write_output_csv(args.output)
-        print scan.exit_banner()
+        print scan.exit_banner
     except KeyboardInterrupt:
         sys.exit('# Scan interrupted')
     except (dns.resolver.NoNameservers):
