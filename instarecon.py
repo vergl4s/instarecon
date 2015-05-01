@@ -8,6 +8,7 @@ import time
 from random import randint
 import csv
 import os
+import datetime
 
 import pythonwhois as whois #http://cryto.net/pythonwhois/usage.html https://github.com/joepie91/python-whois
 from ipwhois import IPWhois as ipw #https://pypi.python.org/pypi/ipwhois
@@ -86,14 +87,9 @@ class Host(object):
         1) Direct DNS lookup on self.domain
         2) Reverse DNS lookup on each self.ips
         """
-
         if self.type == 'domain':
             self._get_ips()
-            for ip in self.ips: ip.get_rev_domains() 
-
-        if self.type == 'ip':
-            for ip in self.ips: ip.get_rev_domains() 
-
+        for ip in self.ips: ip.get_rev_domains() 
         return self
 
     def mx_dns_lookup(self):
@@ -161,7 +157,7 @@ class Host(object):
         for ip in self.ips:
             cidr_found = False
             for cidr,whois_ip in cidrs_found.iteritems():
-                if ipa.ip_address(ip.ip.decode('unicode-escape')) in ipa.ip_network(cidr.decode('unicode-escape')):
+                if ipa.ip_address(ip.ip.decode('unicode-escape')) in cidr: #cidr already IPv4.Network obj
                     #If cidr is already in Host, we won't get_whois_ip again.
                     #Instead we will save cidr in ip just to make it easier to relate them later
                     ip.cidr,ip.whois_ip = cidr,whois_ip
@@ -171,7 +167,7 @@ class Host(object):
                 ip.get_whois_ip()
                 cidrs_found[ip.cidr] = ip.whois_ip
 
-        self.cidrs = set([ip.cidr for ip in self.ips])
+        self.cidrs = set([ip.cidr for ip in self.ips if ip.cidr])
 
     def get_all_shodan(self,key):
         """
@@ -197,7 +193,7 @@ class Host(object):
     def _ret_host_by_name(name):
         try:
             return Host.dns_resolver.query(name)
-        except (dns.resolver.NXDOMAIN,dns.resolver.NoAnswer) as e:
+        except (dns.resolver.NXDOMAIN,dns.resolver.NoAnswer,dns.exception.Timeout) as e:
             Scan.error('[-] Host lookup failed for '+name,sys._getframe().f_code.co_name)
             pass
 
@@ -206,7 +202,7 @@ class Host(object):
         try:
             #rdata.exchange for domains and rdata.preference for integer
             return [str(mx.exchange).rstrip('.') for mx in Host.dns_resolver.query(name,'MX')]
-        except (dns.resolver.NXDOMAIN,dns.resolver.NoAnswer) as e:
+        except (dns.resolver.NXDOMAIN,dns.resolver.NoAnswer,dns.exception.Timeout) as e:
             Scan.error('[-] MX lookup failed for '+name,sys._getframe().f_code.co_name)
             pass
 
@@ -215,7 +211,7 @@ class Host(object):
         try:
             #rdata.exchange for domains and rdata.preference for integer
             return [str(ns).rstrip('.') for ns in Host.dns_resolver.query(name,'NS')]
-        except (dns.resolver.NXDOMAIN,dns.resolver.NoAnswer) as e:
+        except (dns.resolver.NXDOMAIN,dns.resolver.NoAnswer,dns.exception.Timeout) as e:
             Scan.error('[-] NS lookup failed for '+name,sys._getframe().f_code.co_name)
             pass
 
@@ -362,11 +358,7 @@ class Host(object):
                     except Exception as e:
                         pass     
         else:
-            try:
-                return dns.name.from_text(subdomain).is_subdomain(dns.name.from_text(self.domain))
-            except Exception as e:
-                pass
-
+            return dns.name.from_text(subdomain).is_subdomain(dns.name.from_text(self.domain))
         return False
 
     def reverse_lookup_on_related_cidrs(self,feedback=False):
@@ -381,17 +373,23 @@ class Host(object):
                 lookup_result = None
                 #Used to repeat same scan if user issues KeyboardInterrupt
                 this_scan_completed = False
-                
+
                 while not this_scan_completed:
                     try:
                         lookup_result = Host.dns_resolver.query(dns.reversename.from_address(str(ip)),'PTR')
                         this_scan_completed = True
                     except (dns.resolver.NXDOMAIN,dns.resolver.NoAnswer) as e:
                         this_scan_completed = True
+                    except (dns.exception.Timeout) as e:
+                        #TODO what to do when this timesout?
+                        this_scan_completed = True
                     except KeyboardInterrupt:
-                        if raw_input('[-] Sure you want to stop scanning '+str(cidr)+\
-                            '? Program flow will continue normally. (y/N):') in ['Y','y']:
-                            return
+                        if isinstance(self, Network):
+                            raise KeyboardInterrupt
+                        else:
+                            if raw_input('[-] Sure you want to stop scanning '+str(cidr)+\
+                                '? Program flow will continue normally. (y/N):') in ['Y','y']:
+                                return
 
                     if lookup_result:
                         #Organizing reverse lookup results
@@ -487,7 +485,7 @@ class Host(object):
                     ip.print_whois_ip(),
                     ip.print_shodan(),
                     self.linkedin_page,
-                    ', '.join(self.cidrs)
+                    ', '.join([str(cidr) for cidr in self.cidrs])
                 ]
 
         if self.subdomains:
@@ -535,13 +533,26 @@ class Network(Host):
     related_hosts -- set of valid Hosts found by scanning each cidr in cidrs
     """
     def __init__(self,cidrs=()):
+        """
+        cidrs parameter should be an iterable containing a single ipaddress.IPv4Network
+        It is treated as a set of CIDRs to allow reuse of methods from Host
+        """
         self.cidrs = set([ cidr for cidr in cidrs if isinstance(cidr,ipa.IPv4Network) ])
         if not self.cidrs: raise ValueError
         self.related_hosts = set()
 
-    def print_as_csv_line(self):
-        """Overrides method with same name from Host. Yields each Host within related_hosts as csv line"""
-        yield ['Target: '+', '.join(self.cidrs)]
+    def __str__(self):
+        return ','.join([str(cidr) for cidr in self.cidrs])
+    
+    def __hash__(self):
+        return hash(('cidrs',','.join([str(cidr) for cidr in self.cidrs])))
+    
+    def __eq__(self,other):
+        return self.cidrs == other.cidrs
+
+    def print_as_csv_lines(self):
+        """Overrides method from Host. Yields each Host in related_hosts as csv line"""
+        yield ['Target: '+', '.join([ str(cidr) for cidr in self.cidrs ])]
         
         if self.related_hosts:
             yield ['IP','Reverse domains',]
@@ -585,7 +596,7 @@ class IP(object):
     def _ret_host_by_ip(ip):
         try:
             return Host.dns_resolver.query(dns.reversename.from_address(ip),'PTR')
-        except (dns.resolver.NXDOMAIN,dns.resolver.NoAnswer) as e:
+        except (dns.resolver.NXDOMAIN,dns.resolver.NoAnswer,dns.exception.Timeout) as e:
             Scan.error('[-] Host lookup failed for '+ip,sys._getframe().f_code.co_name)
 
     def get_rev_domains(self):
@@ -615,7 +626,6 @@ class IP(object):
                     self.cidr = ipa.ip_network(
                         ipa.ip_network(self.whois_ip['nets'][0]['cidr'].decode('unicode-escape')),
                         strict=False)
-
         return self
     
     def print_ip(self):
@@ -627,22 +637,39 @@ class IP(object):
             else:
                 for rev in self.rev_domains:
                     ret =  '\t'.join([ret,'\n',rev])
-
         return ret
 
     def print_whois_ip(self):
         if self.whois_ip:
             result = ''
-            #Printing all lines except 'nets'
+            #Printing all lines except 'nets' annd 'query'
             for key,val in sorted(self.whois_ip.iteritems()):
                 if val and key not in ['nets','query']:
                     result = '\n'.join([result,key+': '+str(val)])
             #Printing each dict within 'nets'
-            for key,val in enumerate(self.whois_ip['nets']):
+            for key,net in enumerate(self.whois_ip['nets']):
                 result = '\n'.join([result,'net '+str(key)+':'])
-                for key2,val2 in sorted(val.iteritems()):
-                        result = '\n\t'.join([result,key2+': '+str(val2).replace('\n',', ')])     
+                if net['cidr']: result = '\n\t'.join([ result,'cidr' + ': ' + net['cidr'].replace('\n',', ') ])
+                if net['range']: result = '\n\t'.join([ result,'range' + ': ' + net['range'].replace('\n',', ') ])
+                if net['name']: result = '\n\t'.join([ result,'name' + ': ' + net['name'].replace('\n',', ') ])
+                if net['description']: result = '\n\t'.join([ result,'description' + ': ' + net['description'].replace('\n',', ') ])
+                if net['handle']:  result = '\n\t'.join([ result,'handle' + ': ' + net['handle'].replace('\n',', ') ])
+                result = '\n\t'.join([ result,'' ])
+                if net['address']:  result = '\n\t'.join([ result,'address' + ': ' + net['address'].replace('\n',', ') ])
+                if net['city']:  result = '\n\t'.join([ result,'city' + ': ' + net['city'].replace('\n',', ') ])
+                if net['state']:  result = '\n\t'.join([ result,'state' + ': ' + net['state'].replace('\n',', ') ])
+                if net['postal_code']:  result = '\n\t'.join([ result,'postal_code' + ': ' + net['postal_code'].replace('\n',', ') ])
+                if net['country']:  result = '\n\t'.join([ result,'country' + ': ' + net['country'].replace('\n',', ') ])
+                result = '\n\t'.join([ result,'' ])
+                if net['abuse_emails']:  result = '\n\t'.join([ result,'abuse_emails' + ': ' + net['abuse_emails'].replace('\n',', ') ])
+                if net['tech_emails']:  result = '\n\t'.join([ result,'tech_emails' + ': ' + net['tech_emails'].replace('\n',', ') ])
+                if net['misc_emails']:  result = '\n\t'.join([ result,'misc_emails' + ': ' + net['misc_emails'].replace('\n',', ') ])
+                result = '\n\t'.join([ result,'' ])
+                if net['created']:  result = '\n\t'.join([ result,'created' + ': ' + time.strftime("%Y-%m-%d %H:%M:%S", time.strptime(net['created'].replace('\n',', '),'%Y-%m-%dT%H:%M:%S')) ])
+                if net['updated']:  result = '\n\t'.join([ result,'updated' + ': ' + time.strftime("%Y-%m-%d %H:%M:%S", time.strptime(net['updated'].replace('\n',', '),'%Y-%m-%dT%H:%M:%S')) ])
 
+                # for key2,val2 in sorted(net.iteritems()):
+                #         result = '\n\t'.join([result,key2+': '+str(val2).replace('\n',', ')])     
             return result.lstrip().rstrip()
 
     def print_shodan(self):
@@ -685,12 +712,16 @@ class Scan(object):
     verbose = False
     shodan_key = None
 
-    def __init__(self,nameserver=None,shodan_key=None,feedback=False,verbose=False,dns_only=False):
+    def __init__(self,nameserver=None,timeout=None,shodan_key=None,feedback=False,verbose=False,dns_only=False):
 
         Scan.feedback = feedback
         Scan.verbose=verbose
         Scan.shodan_key = shodan_key
-        if nameserver: Host.dns_resolver.nameservers = [nameserver]
+        if nameserver: 
+            Host.dns_resolver.nameservers = [nameserver]
+        if timeout: 
+            Host.dns_resolver.timeout = timeout
+            Host.dns_resolver.lifetime = timeout
         self.dns_only = dns_only
         self.targets = set()
         self.bad_targets = set()
@@ -746,7 +777,7 @@ class Scan(object):
             return
         except (dns.resolver.NXDOMAIN, dns.exception.SyntaxError) as e:
             #If here so results from network won't be so verbose
-            if Scan.feedback: print '[-] Error: Couldn\'t resolve or understand', user_supplied
+            if Scan.feedback: print '[-] Couldn\'t resolve or understand', user_supplied
             pass
 
         self.bad_targets.add(user_supplied)
@@ -759,17 +790,21 @@ class Scan(object):
                 else:
                     self.full_scan_on_host(target)
             elif type(target) is Network:
-                if self.feedback:
-                    print ''
-                    print '# Unable to scan {}. Scanning networks not yet implemented... sorry!'.format(str(target))
-                pass
+                self.reverse_dns_on_network(target)
+
+    def reverse_dns_on_network(self,network):
+        """Does reverse dns lookups on a network object"""
+        fb = self.feedback
+        if fb:
+            print '# _____________ Reverse DNS lookup on {} _____________ #'.format(str(network))
+
+        network.reverse_lookup_on_related_cidrs(fb)
 
     def full_scan_on_host(self,host):
         """Does all possible scans for host"""
         fb = self.feedback
             
         if fb: 
-            print ''
             print '# ____________________ Scanning {} ____________________ #'.format(str(host))
 
         ###DNS and Whois lookups
@@ -859,7 +894,7 @@ class Scan(object):
         if host.cidrs:
             if fb:
                 print ''
-                print '# Reverse DNS lookup on range(s) {}'.format(', '.join(host.cidrs))
+                print '# Reverse DNS lookup on range(s) {}'.format(', '.join([str(cidr) for cidr in host.cidrs]))
             host.reverse_lookup_on_related_cidrs(feedback=True)
     
     def dns_scan_on_host(self,host):
@@ -867,7 +902,6 @@ class Scan(object):
         fb = self.feedback
             
         if fb: 
-            print ''
             print '# _________________ DNS lookups for {} _________________ #'.format(str(host))
 
         host.dns_lookups()
@@ -883,7 +917,6 @@ class Scan(object):
             fb = self.feedback
 
             if fb: 
-                print '' 
                 print '# Saving output csv file'
 
             output_as_lines = []
@@ -917,25 +950,30 @@ class Scan(object):
                 except KeyboardInterrupt:
                     if raw_input('[-] Sure you want to exit without saving your file (Y/n)?') in ['y','Y','']:
                         sys.exit('# Scan interrupted')
-    
-    def print_banner(self):
-        if self.feedback:
-            print '# InstaRecon - basic automated digital reconnaissance - by Luis Teixeira'
 
-    def print_exit(self):
-        if self.feedback:
-            print ''
-            print '# Done'
+    @staticmethod    
+    def entry_banner():
+        if Scan.feedback:
+            return '\n'.join([
+                '',
+                '# InstaRecon - basic automated digital reconnaissance - by Luis Teixeira',
+                '',
+            ])
+
+    @staticmethod
+    def exit_banner():
+        if Scan.feedback:
+            return '# Done'
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='InstaRecon - basic automated digital reconnaissance - by Luis Teixeira',
-        usage='%(prog)s [options] target1 [target2] ... [targetN]',
-        epilog='example of use: instarecon.py google.com',
+        description='# InstaRecon - basic automated digital reconnaissance - by Luis Teixeira',
+        usage='%(prog)s [options] target1 [target2 ... targetN]',
+        epilog=argparse.SUPPRESS,
         )
     parser.add_argument('targets', nargs='+', help='targets to be scanned - can be in the format of a domain (google.com), an IP (8.8.8.8) or a network range (8.8.8.0/24)')
     parser.add_argument('-o', '--output', required=False,nargs='?',help='output filename as csv')
-    parser.add_argument('-n', '--nameserver', required=False, nargs='?',help='alternative DNS server to query')
+    parser.add_argument('-n', '--nameserver', required=False,nargs='?',help='alternative DNS server to query')
     parser.add_argument('-s', '--shodan_key', required=False,nargs='?',help='shodan key for automated port/service information')
     parser.add_argument('-v','--verbose', action='store_true',help='verbose errors')
     parser.add_argument('-d','--dns_only', action='store_true',help='direct and reverse DNS lookups only')
@@ -952,12 +990,12 @@ if __name__ == '__main__':
         )
     
     try:
-        scan.print_banner()
+        print scan.entry_banner()
         scan.populate(targets)
         scan.scan_targets()
         scan.write_output_csv(args.output)
-        scan.exit()
+        print scan.exit_banner()
     except KeyboardInterrupt:
         sys.exit('# Scan interrupted')
-    except (dns.exception.Timeout,dns.resolver.NoNameservers):
+    except (dns.resolver.NoNameservers):
         sys.exit('# Something went wrong. Sure you got internet connection?')
