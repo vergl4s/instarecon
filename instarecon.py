@@ -339,7 +339,7 @@ class Host(object):
         In addition it filters out invalid dns names
         """
         if isinstance(subdomain, Host):
-            #If subdomain has .domain (probably found through google lookup)
+            #If subdomain has .domain
             if subdomain.domain:
                 try:
                     return dns.name.from_text(subdomain.domain).is_subdomain(dns.name.from_text(self.domain))
@@ -358,7 +358,12 @@ class Host(object):
                     except Exception as e:
                         pass     
         else:
-            return dns.name.from_text(subdomain).is_subdomain(dns.name.from_text(self.domain))
+            try:
+                return dns.name.from_text(subdomain).is_subdomain(dns.name.from_text(self.domain))
+            except dns.name.EmptyLabel:
+                #EmptyLabel is exception for bad dns string
+                pass
+            
         return False
 
     def reverse_lookup_on_related_cidrs(self,feedback=False):
@@ -378,10 +383,10 @@ class Host(object):
                     try:
                         lookup_result = Host.dns_resolver.query(dns.reversename.from_address(str(ip)),'PTR')
                         this_scan_completed = True
-                    except (dns.resolver.NXDOMAIN,dns.resolver.NoAnswer) as e:
-                        this_scan_completed = True
-                    except (dns.exception.Timeout) as e:
-                        #TODO what to do when this timesout?
+                    except (dns.resolver.NXDOMAIN,
+                        dns.resolver.NoAnswer,
+                        dns.resolver.NoNameservers,
+                        dns.exception.Timeout) as e:
                         this_scan_completed = True
                     except KeyboardInterrupt:
                         if isinstance(self, Network):
@@ -406,6 +411,8 @@ class Host(object):
                             self._add_to_subdomains_if_valid(subdomains_as_hosts=[new_host])
 
                         if feedback: print new_host.print_all_ips()
+
+        if not self.related_hosts: print '# No results for this range'
 
     def print_all_ips(self):
         if self.ips:
@@ -455,8 +462,8 @@ class Host(object):
 
     def print_as_csv_lines(self):
         """Generator that yields each IP within self.ips as a csv line."""
-        
-        yield ['Target: '+self.domain]
+
+        yield ['Target:', str(self)]
         
         if self.ips:
             yield [
@@ -465,7 +472,7 @@ class Host(object):
                     'Reverse domains',
                     'NS',
                     'MX',
-                    'Subdomains',
+                    # 'Subdomains',
                     'Domain whois',
                     'IP whois',
                     'Shodan',
@@ -480,7 +487,7 @@ class Host(object):
                     '\n'.join(ip.rev_domains),
                     self.print_all_ns(),
                     self.print_all_mx(),
-                    self.print_subdomains(),
+                    # self.print_subdomains(),
                     self.whois_domain,
                     ip.print_whois_ip(),
                     ip.print_shodan(),
@@ -502,7 +509,7 @@ class Host(object):
 
         if self.related_hosts:
             yield ['\n']
-            yield ['Hosts in same CIDR as '+str(self.domain)]
+            yield ['Hosts in same CIDR as '+str(self)]
             yield ['IP','Reverse domains']
 
             for sub in sorted(self.related_hosts):
@@ -561,6 +568,8 @@ class Network(Host):
                     ', '.join([ str(ip) for ip in host.ips ]),
                     ', '.join([ ', '.join(ip.rev_domains) for ip in host.ips ]),
                 ]
+        else:
+            yield ['No results']
 
 class IP(object):
     """
@@ -623,9 +632,11 @@ class IP(object):
         if self.whois_ip:
             if 'nets' in self.whois_ip:
                 if self.whois_ip['nets']:
-                    self.cidr = ipa.ip_network(
-                        ipa.ip_network(self.whois_ip['nets'][0]['cidr'].decode('unicode-escape')),
-                        strict=False)
+                    cidrs = [ ipa.ip_network(net['cidr'].decode('unicode-escape'),strict=False) for net in self.whois_ip['nets'] ]
+                    for cidr in cidrs:
+                        self.cidr = self.cidr or cidr
+                        if cidr.num_addresses > self.cidr.num_addresses:
+                            self.cidr = cidr
         return self
     
     def print_ip(self):
@@ -796,7 +807,8 @@ class Scan(object):
         """Does reverse dns lookups on a network object"""
         fb = self.feedback
         if fb:
-            print '# _____________ Reverse DNS lookup on {} _____________ #'.format(str(network))
+            print ''
+            print '# _____________ Reverse DNS lookups on {} _____________ #'.format(str(network))
 
         network.reverse_lookup_on_related_cidrs(fb)
 
@@ -805,6 +817,7 @@ class Scan(object):
         fb = self.feedback
             
         if fb: 
+            print ''
             print '# ____________________ Scanning {} ____________________ #'.format(str(host))
 
         ###DNS and Whois lookups
@@ -815,7 +828,6 @@ class Scan(object):
         host.dns_lookups()
         if fb:
             if host.domain:
-                print ''
                 print '[*] Domain: '+host.domain
             
             #IPs and reverse domains
@@ -844,7 +856,7 @@ class Scan(object):
 
         host.get_whois_domain()
         if host.whois_domain and fb:
-            print '' 
+            print ''
             print '[*] Whois domain:'
             print host.whois_domain
 
@@ -874,18 +886,16 @@ class Scan(object):
         #Google subdomains lookup
         if host.domain:
             if fb:
-                print '' 
+                print ''
                 print '# Querying Google for subdomains and Linkedin pages, this might take a while'
             
             host.google_lookups()
             
             if fb:
                 if host.linkedin_page:
-                    print ''
                     print '[*] Possible LinkedIn page: '+host.linkedin_page
 
                 if host.subdomains:
-                    print ''
                     print '[*] Subdomains:'+'\n'+host.print_subdomains()
                 else:
                     print '[-] Error: No subdomains found in Google. If you are scanning a lot, Google might be blocking your requests.'
@@ -894,7 +904,7 @@ class Scan(object):
         if host.cidrs:
             if fb:
                 print ''
-                print '# Reverse DNS lookup on range(s) {}'.format(', '.join([str(cidr) for cidr in host.cidrs]))
+                print '# Reverse DNS lookup on range {}'.format(', '.join([str(cidr) for cidr in host.cidrs]))
             host.reverse_lookup_on_related_cidrs(feedback=True)
     
     def dns_scan_on_host(self,host):
@@ -902,7 +912,8 @@ class Scan(object):
         fb = self.feedback
             
         if fb: 
-            print '# _________________ DNS lookups for {} _________________ #'.format(str(host))
+            print ''
+            print '# _________________ DNS lookups on {} _________________ #'.format(str(host))
 
         host.dns_lookups()
         if fb:
@@ -927,8 +938,10 @@ class Scan(object):
                     generator = host.print_as_csv_lines()
                     while True:
                         output_as_lines.append(generator.next())
+
                 except StopIteration:
-                    pass
+                    #Space between targets
+                    output_as_lines.append(['\n'])
                 
             output_written = False
             while not output_written:
@@ -989,3 +1002,5 @@ if __name__ == '__main__':
         sys.exit('# Scan interrupted')
     except (dns.resolver.NoNameservers):
         sys.exit('# Something went wrong. Sure you got internet connection?')
+    
+        
