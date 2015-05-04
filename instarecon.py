@@ -702,7 +702,6 @@ class IP(object):
                         'Port: {}'.format(item['port']),
                         'Banner: {}'.format(item['data'].replace('\n','\n\t').rstrip()),
                         ])
-
             return result.rstrip().lstrip()
 
 class Scan(object):
@@ -721,6 +720,8 @@ class Scan(object):
     feedback = False
     verbose = False
     shodan_key = None
+    entry_banner = '# InstaRecon v0.1 - by Luis Teixeira (teix.co)'
+    exit_banner = '# Done'
 
     def __init__(self,nameserver=None,timeout=None,shodan_key=None,feedback=False,verbose=False,dns_only=False):
 
@@ -962,10 +963,6 @@ class Scan(object):
                 except KeyboardInterrupt:
                     if raw_input('[-] Sure you want to exit without saving your file (Y/n)?') in ['y','Y','']:
                         sys.exit('# Scan interrupted')
-
-
-    entry_banner = 'InstaRecon v0.1 - by Luis Teixeira (teix.co)'
-    exit_banner = '# Done'
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
