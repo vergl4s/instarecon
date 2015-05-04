@@ -3,9 +3,8 @@ InstaRecon
 
 Automated basic digital reconnaissance. Great for getting an initial footprint of your targets.
 
-* Direct and reverse DNS lookups
-* MX and NS lookups
-* Domain and IP Whois lookups
+* DNS lookups
+* Whois lookups
 * Google queries to get subdomains
 * [Shodan](https://www.shodan.io/) lookups
 * Reverse DNS lookups on entire CIDRs looking for subdomains
