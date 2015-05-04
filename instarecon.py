@@ -139,9 +139,9 @@ class Host(object):
         try:
             if self.domain:
                 query = whois.get_whois(self.domain)
-                
+
                 if 'raw' in query:
-                    self.whois_domain = query['raw'][0].lstrip().rstrip()
+                    self.whois_domain = query['raw'][0].split('<')[0].lstrip().rstrip()
 
         except Exception as e:
             Scan.error(e,sys._getframe().f_code.co_name)
@@ -361,7 +361,7 @@ class Host(object):
             try:
                 return dns.name.from_text(subdomain).is_subdomain(dns.name.from_text(self.domain))
             except dns.name.EmptyLabel:
-                #EmptyLabel is exception for bad dns string
+                #EmptyLabel is an exception raised for bad dns strings
                 pass
             
         return False
