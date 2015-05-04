@@ -1,7 +1,7 @@
 InstaRecon
 =======
 
-Automated basic digital reconnaissance. Great for getting an initial footprint of your targets. InstaRecon will do:
+Automated basic digital reconnaissance. Great for getting an initial footprint of your targets and discovering additional subdomains. InstaRecon will do:
 
 * DNS (direct, PTR, MX, NS) lookups
 * Whois (domains and IP) lookups
@@ -9,7 +9,7 @@ Automated basic digital reconnaissance. Great for getting an initial footprint o
 * [Shodan](https://www.shodan.io/) lookups
 * Reverse DNS lookups on entire CIDRs
 
-All printed nicely on your shell or csv file.
+...all printed nicely on your console or csv file. 
 
 InstaRecon will never scan a target directly. Information is retrieved from DNS/Whois servers, Google, and [Shodan](https://www.shodan.io/).
 
