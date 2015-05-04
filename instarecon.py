@@ -500,7 +500,7 @@ class Host(object):
             yield ['Subdomains for '+str(self.domain)]
             yield ['Domain','IP','Reverse domains']
             
-            for sub in sorted(self.subdomains):
+            for sub in sorted(self.subdomains, key=lambda x: x.domain):
                 for ip in sub.ips:
                     if sub.domain: 
                         yield [ sub.domain,ip.ip,','.join( ip.rev_domains ) ]
@@ -509,10 +509,10 @@ class Host(object):
 
         if self.related_hosts:
             yield ['\n']
-            yield ['Hosts in same CIDR as '+str(self)]
+            yield ['Hosts in same CIDR as',str(self),'(all results found, including subdomains)']
             yield ['IP','Reverse domains']
 
-            for sub in sorted(self.related_hosts):
+            for sub in sorted(self.related_hosts, key=lambda x: x.ips[0]):
                 yield [
                     ','.join([ str(ip) for ip in sub.ips ]),
                     ','.join([ ','.join(ip.rev_domains) for ip in sub.ips ]),
