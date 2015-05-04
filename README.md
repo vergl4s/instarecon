@@ -1,13 +1,15 @@
 InstaRecon
 =======
 
-Automated basic digital reconnaissance. Great for getting an initial footprint of your targets.
+Automated basic digital reconnaissance. Great for getting an initial footprint of your targets. InstaRecon will do:
 
-* DNS lookups
-* Whois lookups
-* Google queries to get subdomains
+* DNS (direct, PTR, MX, NS) lookups
+* Whois (domains and IP) lookups
+* Google dorks in search of subdomains
 * [Shodan](https://www.shodan.io/) lookups
-* Reverse DNS lookups on entire CIDRs looking for subdomains
+* Reverse DNS lookups on entire CIDRs
+
+All printed nicely on your shell or csv file.
 
 InstaRecon will never scan a target directly. Information is retrieved from DNS/Whois servers, Google, and [Shodan](https://www.shodan.io/).
 
@@ -24,18 +26,18 @@ pip install pythonwhois ipwhois ipaddress shodan
 
 ###Example
 ```bash
-$ ./instarecon.py -s <shodan_key> -o ~/Desktop/github.csv github.com
+$ ./instarecon.py -s <shodan_key> -o ~/Desktop/github.com.csv github.com
+# InstaRecon v0.1 - by Luis Teixeira (teix.co)
 # Scanning 1/1 hosts
 # Shodan key provided - <shodan_key>
 
 # ____________________ Scanning github.com ____________________ #
 
 # DNS lookups
-
 [*] Domain: github.com
 
 [*] IPs & reverse DNS: 
-192.30.252.128 - github.com
+192.30.252.130 - github.com
 
 [*] NS records:
 ns4.p16.dynect.net
@@ -48,14 +50,14 @@ ns1.p16.dynect.net
     208.78.70.16 - ns1.p16.dynect.net
 
 [*] MX records:
-ASPMX.L.GOOGLE.com
-    173.194.72.27 - tf-in-f27.1e100.net
 ALT2.ASPMX.L.GOOGLE.com
-    173.194.74.26 - qe-in-f26.1e100.net
+    173.194.64.27 - oa-in-f27.1e100.net
+ASPMX.L.GOOGLE.com
+    74.125.203.26
 ALT3.ASPMX.L.GOOGLE.com
-    74.125.21.26 - yv-in-f26.1e100.net
+    64.233.177.26
 ALT4.ASPMX.L.GOOGLE.com
-    173.194.76.26 - qc-in-f26.1e100.net
+    173.194.219.27
 ALT1.ASPMX.L.GOOGLE.com
     74.125.25.26 - pa-in-f26.1e100.net
 
@@ -115,74 +117,46 @@ Tech Phone Ext:
 Tech Fax: 
 Tech Fax Ext: 
 Tech Email: hostmaster@github.com
+Name Server: ns1.p16.dynect.net
 Name Server: ns2.p16.dynect.net
 Name Server: ns4.p16.dynect.net
-Name Server: ns1.p16.dynect.net
 Name Server: ns3.p16.dynect.net
 DNSSEC: unsigned
 URL of the ICANN WHOIS Data Problem Reporting System: http://wdprs.internic.net/
->>> Last update of WHOIS database: 2015-04-13T17:23:13-0700 <<<
-
-The Data in MarkMonitor.com\'s WHOIS database is provided by MarkMonitor.com for
-information purposes, and to assist persons in obtaining information about or
-related to a domain name registration record.  MarkMonitor.com does not guarantee
-its accuracy.  By submitting a WHOIS query, you agree that you will use this Data
-only for lawful purposes and that, under no circumstances will you use this Data to:
- (1) allow, enable, or otherwise support the transmission of mass unsolicited,
-     commercial advertising or solicitations via e-mail (spam); or
- (2) enable high volume, automated, electronic processes that apply to
-     MarkMonitor.com (or its systems).
-MarkMonitor.com reserves the right to modify these terms at any time.
-By submitting this query, you agree to abide by this policy.
-
-MarkMonitor is the Global Leader in Online Brand Protection.
-
-MarkMonitor Domain Management(TM)
-MarkMonitor Brand Protection(TM)
-MarkMonitor AntiPiracy(TM)
-MarkMonitor AntiFraud(TM)
-Professional and Managed Services
-
-Visit MarkMonitor at http://www.markmonitor.com
-Contact us at +1.8007459229
-In Europe, at +44.02032062220
---
+>>> Last update of WHOIS database: 2015-05-04T06:48:47-0700
 
 [*] Whois IP:
 asn: 36459
-asn_cidr: 192.30.252.0/22
+asn_cidr: 192.30.252.0/24
 asn_country_code: US
 asn_date: 2012-11-15
 asn_registry: arin
-query: 192.30.252.128
 net 0:
-    abuse_emails: abuse@github.com
-    address: 88 Colin P Kelly Jr Street
     cidr: 192.30.252.0/22
-    city: San Francisco
-    country: US
-    created: 2012-11-15T00:00:00
+    range: 192.30.252.0 - 192.30.255.255
+    name: GITHUB-NET4-1
     description: GitHub, Inc.
     handle: NET-192-30-252-0-1
-    misc_emails: None
-    name: GITHUB-NET4-1
-    postal_code: 94107
-    range: 192.30.252.0 - 192.30.255.255
+    
+    address: 88 Colin P Kelly Jr Street
+    city: San Francisco
     state: CA
+    postal_code: 94107
+    country: US
+    
+    abuse_emails: abuse@github.com
     tech_emails: hostmaster@github.com
-    updated: 2013-01-05T00:00:00
+    
+    created: 2012-11-15 00:00:00
+    updated: 2013-01-05 00:00:00
 
 # Querying Shodan for open ports
-
 [*] Shodan:
-IP: 192.30.252.128
+IP: 192.30.252.130
 Organization: GitHub
 ISP: GitHub
-Port: 80
-Banner: HTTP/1.1 301 Moved Permanently
-    Content-length: 0
-    Location: https://192.30.252.128/
-    Connection: closePort: 22
+
+Port: 22
 Banner: SSH-2.0-libssh-0.6.0
     Key type: ssh-rsa
     Key: AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PH
@@ -191,136 +165,156 @@ Banner: SSH-2.0-libssh-0.6.0
     f9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lG
     HSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
     Fingerprint: 16:27:ac:a5:76:28:2d:36:63:1b:56:4d:eb:df:a6:48
+Port: 80
+Banner: HTTP/1.1 301 Moved Permanently
+    Content-length: 0
+    Location: https://192.30.252.130/
+    Connection: close
 
 # Querying Google for subdomains and Linkedin pages, this might take a while
-
 [*] Possible LinkedIn page: https://au.linkedin.com/company/github
-
 [*] Subdomains:
-addyosmani.github.com
-    199.27.78.133
-ajaxorg.github.com
-    199.27.78.133
-akkadotnet.github.com
-    199.27.78.133
-arshad.github.com
-    199.27.78.133
-ask.github.com
-    199.27.78.133
-assaf.github.com
-    199.27.78.133
-cocoapods.github.com
-    199.27.78.133
-daid.github.com
-    199.27.78.133
+blueimp.github.com
+    199.27.75.133
+bounty.github.com
+    199.27.75.133
 designmodo.github.com
-    199.27.78.133
+    199.27.75.133
 developer.github.com
-    199.27.78.133
+    199.27.75.133
+digitaloxford.github.com
+    199.27.75.133
+documentcloud.github.com
+    199.27.75.133
 education.github.com
-    50.17.253.231 - ec2-50-17-253-231.compute-1.amazonaws.com
-    23.23.134.127 - ec2-23-23-134-127.compute-1.amazonaws.com
     50.19.229.116 - ec2-50-19-229-116.compute-1.amazonaws.com
+    50.17.253.231 - ec2-50-17-253-231.compute-1.amazonaws.com
+    54.221.249.148 - ec2-54-221-249-148.compute-1.amazonaws.com
 enterprise.github.com
-    54.235.132.86 - ec2-54-235-132-86.compute-1.amazonaws.com
-    54.235.148.255 - ec2-54-235-148-255.compute-1.amazonaws.com
-eonasdan.github.com
-    199.27.78.133
+    54.243.192.65 - ec2-54-243-192-65.compute-1.amazonaws.com
+    54.243.49.169 - ec2-54-243-49-169.compute-1.amazonaws.com
+erkie.github.com
+    199.27.75.133
 eternicode.github.com
-    199.27.78.133
-fabriziogiordano.github.com
-    199.27.78.133
-fontforge.github.com
-    199.27.78.133
+    199.27.75.133
+facebook.github.com
+    199.27.75.133
 fortawesome.github.com
-    199.27.78.133
+    199.27.75.133
 gist.github.com
     192.30.252.141 - gist.github.com
-greggman.github.com
-    199.27.78.133
 guides.github.com
-    199.27.78.133
+    199.27.75.133
+h5bp.github.com
+    199.27.75.133
+harvesthq.github.com
+    199.27.75.133
 help.github.com
-    199.27.78.133
+    199.27.75.133
 hexchat.github.com
-    199.27.78.133
-imakewebthings.github.com
-    199.27.78.133
+    199.27.75.133
+hubot.github.com
+    199.27.75.133
+ipython.github.com
+    199.27.75.133
+janpaepke.github.com
+    199.27.75.133
 jgilfelt.github.com
-    199.27.78.133
+    199.27.75.133
 jobs.github.com
     54.163.15.207 - ec2-54-163-15-207.compute-1.amazonaws.com
-joey711.github.com
-    199.27.78.133
 kangax.github.com
-    199.27.78.133
-launch.github.com
-    192.30.252.128 - github.com
+    199.27.75.133
+karlseguin.github.com
+    199.27.75.133
+kouphax.github.com
+    199.27.75.133
 learnboost.github.com
-    199.27.78.133
+    199.27.75.133
+liferay.github.com
+    199.27.75.133
+lloyd.github.com
+    199.27.75.133
 mac.github.com
-    199.27.78.133
+    199.27.75.133
 mapbox.github.com
-    199.27.78.133
+    199.27.75.133
 matplotlib.github.com
-    199.27.78.133
+    199.27.75.133
 mbostock.github.com
-    199.27.78.133
-mgcrea.github.com
-    199.27.78.133
+    199.27.75.133
+mdo.github.com
+    199.27.75.133
 mindmup.github.com
-    199.27.78.133
+    199.27.75.133
 mrdoob.github.com
-    199.27.78.133
+    199.27.75.133
 msysgit.github.com
-    199.27.78.133
-mustache.github.com
-    199.27.78.133
-mxcl.github.com
-    199.27.78.133
+    199.27.75.133
+nativescript.github.com
+    199.27.75.133
 necolas.github.com
-    199.27.78.133
-nltk.github.com
-    199.27.78.133
-osxfuse.github.com
-    199.27.78.133
+    199.27.75.133
+nodeca.github.com
+    199.27.75.133
+onedrive.github.com
+    199.27.75.133
 pages.github.com
-    199.27.78.133
+    199.27.75.133
 panrafal.github.com
-    199.27.78.133
-pcottle.github.com
-    199.27.78.133
-philogb.github.com
-    199.27.78.133
+    199.27.75.133
+parquet.github.com
+    199.27.75.133
 pnts.github.com
-    199.27.78.133
+    199.27.75.133
 raw.github.com
-    199.27.78.133
+    199.27.75.133
 rg3.github.com
-    199.27.78.133
+    199.27.75.133
+rosedu.github.com
+    199.27.75.133
+schacon.github.com
+    199.27.75.133
+scottjehl.github.com
+    199.27.75.133
 shop.github.com
-    192.30.252.128 - github.com
+    192.30.252.129 - github.com
+shopify.github.com
+    199.27.75.133
 status.github.com
-    107.20.225.214 - ec2-107-20-225-214.compute-1.amazonaws.com
     184.73.218.119 - ec2-184-73-218-119.compute-1.amazonaws.com
+    107.20.225.214 - ec2-107-20-225-214.compute-1.amazonaws.com
 thoughtbot.github.com
-    199.27.78.133
+    199.27.75.133
 tomchristie.github.com
-    199.27.78.133
+    199.27.75.133
 training.github.com
-    199.27.78.133
+    199.27.75.133
 try.github.com
-    199.27.78.133
+    199.27.75.133
 twbs.github.com
-    199.27.78.133
+    199.27.75.133
 twitter.github.com
-    199.27.78.133
-windows.github.com
-    199.27.78.133
-yui.github.com
-    199.27.78.133
+    199.27.75.133
+visualstudio.github.com
+    54.192.134.13 - server-54-192-134-13.syd1.r.cloudfront.net
+    54.230.135.112 - server-54-230-135-112.syd1.r.cloudfront.net
+    54.192.134.21 - server-54-192-134-21.syd1.r.cloudfront.net
+    54.230.134.194 - server-54-230-134-194.syd1.r.cloudfront.net
+    54.192.133.169 - server-54-192-133-169.syd1.r.cloudfront.net
+    54.192.133.193 - server-54-192-133-193.syd1.r.cloudfront.net
+    54.230.134.145 - server-54-230-134-145.syd1.r.cloudfront.net
+    54.240.176.208 - server-54-240-176-208.syd1.r.cloudfront.net
+wagerfield.github.com
+    199.27.75.133
+webcomponents.github.com
+    199.27.75.133
+webpack.github.com
+    199.27.75.133
+weheart.github.com
+    199.27.75.133
 
-# Reverse DNS lookup on range(s) 192.30.252.0/22 (related to github.com)
+# Reverse DNS lookup on range 192.30.252.0/22
 192.30.252.80 - ns1.github.com
 192.30.252.81 - ns2.github.com
 192.30.252.86 - live.github.com
@@ -389,7 +383,6 @@ yui.github.com
 192.30.254.2 - github-lb3b-cp1-prd.iad.github.com
 192.30.254.3 - github-lb3c-cp1-prd.iad.github.com
 192.30.254.4 - github-lb3d-cp1-prd.iad.github.com
-
 # Saving output csv file
 # Done
 ```
