@@ -697,10 +697,9 @@ class IP(object):
 
             if len(self.shodan['data']) > 0:
                 for item in self.shodan['data']:
-                    result = ''.join([
+                    result = '\n'.join([
                         result,
                         'Port: {}'.format(item['port']),
-                        '\n',
                         'Banner: {}'.format(item['data'].replace('\n','\n\t').rstrip()),
                         ])
 
