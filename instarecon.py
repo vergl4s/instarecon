@@ -144,7 +144,7 @@ class Host(object):
                     self.whois_domain = query['raw'][0].split('<')[0].lstrip().rstrip()
 
         except Exception as e:
-            Scan.error(e,sys._getframe().f_code.co_name)
+            InstaRecon.error(e,sys._getframe().f_code.co_name)
             pass
     
     def get_all_whois_ip(self):
@@ -194,7 +194,7 @@ class Host(object):
         try:
             return Host.dns_resolver.query(name)
         except (dns.resolver.NXDOMAIN,dns.resolver.NoAnswer,dns.exception.Timeout) as e:
-            Scan.error('[-] Host lookup failed for '+name,sys._getframe().f_code.co_name)
+            InstaRecon.error('[-] Host lookup failed for '+name,sys._getframe().f_code.co_name)
             pass
 
     @staticmethod
@@ -203,7 +203,7 @@ class Host(object):
             #rdata.exchange for domains and rdata.preference for integer
             return [str(mx.exchange).rstrip('.') for mx in Host.dns_resolver.query(name,'MX')]
         except (dns.resolver.NXDOMAIN,dns.resolver.NoAnswer,dns.exception.Timeout) as e:
-            Scan.error('[-] MX lookup failed for '+name,sys._getframe().f_code.co_name)
+            InstaRecon.error('[-] MX lookup failed for '+name,sys._getframe().f_code.co_name)
             pass
 
     @staticmethod
@@ -212,7 +212,7 @@ class Host(object):
             #rdata.exchange for domains and rdata.preference for integer
             return [str(ns).rstrip('.') for ns in Host.dns_resolver.query(name,'NS')]
         except (dns.resolver.NXDOMAIN,dns.resolver.NoAnswer,dns.exception.Timeout) as e:
-            Scan.error('[-] NS lookup failed for '+name,sys._getframe().f_code.co_name)
+            InstaRecon.error('[-] NS lookup failed for '+name,sys._getframe().f_code.co_name)
             pass
 
     @staticmethod
@@ -230,7 +230,7 @@ class Host(object):
                 if 'linkedin.com/company/' in url:
                     return re.sub('<.*?>', '', url)
         except Exception as e:
-            Scan.error(e,sys._getframe().f_code.co_name)
+            InstaRecon.error(e,sys._getframe().f_code.co_name)
 
 
     def _ret_subdomains_from_google(self):
@@ -264,7 +264,7 @@ class Host(object):
             try:
                 google_search = requests.get(request)
             except Exception as e:
-                Scan.error(e,sys._getframe().f_code.co_name)
+                InstaRecon.error(e,sys._getframe().f_code.co_name)
 
             new_subdomains = set()
             if google_search:
@@ -606,7 +606,7 @@ class IP(object):
         try:
             return Host.dns_resolver.query(dns.reversename.from_address(ip),'PTR')
         except (dns.resolver.NXDOMAIN,dns.resolver.NoAnswer,dns.exception.Timeout) as e:
-            Scan.error('[-] Host lookup failed for '+ip,sys._getframe().f_code.co_name)
+            InstaRecon.error('[-] Host lookup failed for '+ip,sys._getframe().f_code.co_name)
 
     def get_rev_domains(self):
         rev_domains = None
@@ -621,13 +621,13 @@ class IP(object):
             api = shodan.Shodan(shodan_api_key)
             self.shodan = api.host(str(self))
         except Exception as e:
-            Scan.error(e,sys._getframe().f_code.co_name)
+            InstaRecon.error(e,sys._getframe().f_code.co_name)
 
     def get_whois_ip(self):
         try:
             self.whois_ip = ipw(str(self)).lookup() or None
         except Exception as e:
-            Scan.error(e,sys._getframe().f_code.co_name)
+            InstaRecon.error(e,sys._getframe().f_code.co_name)
         
         if self.whois_ip:
             if 'nets' in self.whois_ip:
@@ -704,30 +704,30 @@ class IP(object):
                         ])
             return result.rstrip().lstrip()
 
-class Scan(object):
+class InstaRecon(object):
     """
-    Object that will hold all Host entries, interpret uset given flags, manage scans, threads and outputs.
+    Holds all Host entries and manages scans, interpret user input, threads and outputs.
 
     Keyword arguments:
     feedback -- Bool flag for output printing. Static variable.
     versobe -- Bool flag for verbose output printing. Static variable.
     nameserver -- Str DNS server to be used for lookups (consumed by dns.resolver module)
     shodan_key -- Str key used for Shodan lookups
-    targets -- Set of Hosts or Networks that will be scanned
+    targets -- Set of Hosts or Networks that will be scanned1
     bad_targets -- Set of user inputs that could not be understood or resolved
     """
-
+    version = '0.1'
     feedback = False
     verbose = False
     shodan_key = None
-    entry_banner = '# InstaRecon v0.1 - by Luis Teixeira (teix.co)'
+    entry_banner = '# InstaRecon v'+version+' - by Luis Teixeira (teix.co)'
     exit_banner = '# Done'
 
     def __init__(self,nameserver=None,timeout=None,shodan_key=None,feedback=False,verbose=False,dns_only=False):
 
-        Scan.feedback = feedback
-        Scan.verbose=verbose
-        Scan.shodan_key = shodan_key
+        InstaRecon.feedback = feedback
+        InstaRecon.verbose=verbose
+        InstaRecon.shodan_key = shodan_key
         if nameserver: 
             Host.dns_resolver.nameservers = [nameserver]
         if timeout: 
@@ -739,7 +739,7 @@ class Scan(object):
 
     @staticmethod
     def error(e, method_name=None):
-        if Scan.feedback and Scan.verbose: 
+        if InstaRecon.feedback and InstaRecon.verbose: 
             print '# Error:', str(e),'| method:',method_name
 
     def populate(self, user_supplied_list):
@@ -788,7 +788,7 @@ class Scan(object):
             return
         except (dns.resolver.NXDOMAIN, dns.exception.SyntaxError) as e:
             #If here so results from network won't be so verbose
-            if Scan.feedback: print '[-] Couldn\'t resolve or understand -', user_supplied
+            if InstaRecon.feedback: print '[-] Couldn\'t resolve or understand -', user_supplied
             pass
 
         self.bad_targets.add(user_supplied)
@@ -966,7 +966,7 @@ class Scan(object):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description=Scan.entry_banner,
+        description=InstaRecon.entry_banner,
         usage='%(prog)s [options] target1 [target2 ... targetN]',
         epilog=argparse.SUPPRESS,
         )
@@ -980,7 +980,7 @@ if __name__ == '__main__':
 
     targets = sorted(set(args.targets))
 
-    scan = Scan(
+    scan = InstaRecon(
         nameserver=args.nameserver,
         shodan_key=args.shodan_key,
         feedback=True,
