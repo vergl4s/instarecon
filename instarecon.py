@@ -980,9 +980,14 @@ if __name__ == '__main__':
 
     targets = sorted(set(args.targets))
 
+    if args.shodan_key:
+        shodan_key = args.shodan_key
+    else:
+        shodan_key = os.getenv('SHODAN_KEY')
+    
     scan = InstaRecon(
         nameserver=args.nameserver,
-        shodan_key=args.shodan_key,
+        shodan_key=shodan_key,
         feedback=True,
         verbose=args.verbose,
         dns_only=args.dns_only,
