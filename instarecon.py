@@ -144,7 +144,7 @@ class Host(object):
                 query = whois.get_whois(self.domain)
 
                 if 'raw' in query:
-                    self.whois_domain = query['raw'][0].split('<')[0].lstrip().rstrip()
+                    self.whois_domain = query['raw'][0].split('<<<')[0].lstrip().rstrip()
 
         except Exception as e:
             InstaRecon.error(e, sys._getframe().f_code.co_name)
