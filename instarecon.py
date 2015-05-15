@@ -39,6 +39,7 @@ class Host(object):
     linkedin_page -- Str of LinkedIn url that contains domain in html
     related_hosts -- Set of Hosts that may be related to host, as they're part of the same cidrs
     cidrs -- set of ipa.Ipv4Networks for each ip.cidr
+    urls -- set of urls found in google results
     """
 
     def __init__(self, domain=None, ips=(), reverse_domains=()):
@@ -120,7 +121,7 @@ class Host(object):
 
     def google_lookups(self):
         """
-        Google queries to find related subdomains and linkedin pages.
+        Google queries to find related subdomains and linkedin pages. Testing.
         """
         if self.domain:
             self.linkedin_page = self._ret_linkedin_page_from_google(self.domain)
