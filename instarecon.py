@@ -59,6 +59,7 @@ class Host(object):
         self.linkedin_page = None
         self.related_hosts = set()
         self.cidrs = set()
+        self.urls = set()
 
     dns_resolver = dns.resolver.Resolver()
     dns_resolver.timeout = 5
@@ -104,6 +105,7 @@ class Host(object):
             if mx_list:
                 self.mx.update([Host(domain=mx).dns_lookups() for mx in mx_list])
                 self._add_to_subdomains_if_valid(subdomains_as_hosts=self.mx)
+        return self
 
     def ns_dns_lookup(self):
         """
@@ -114,6 +116,7 @@ class Host(object):
             if ns_list:
                 self.ns.update([Host(domain=ns).dns_lookups() for ns in ns_list])
                 self._add_to_subdomains_if_valid(subdomains_as_hosts=self.ns)
+        return self
 
     def google_lookups(self):
         """
@@ -123,6 +126,8 @@ class Host(object):
             self.linkedin_page = self._ret_linkedin_page_from_google(self.domain)
 
             self._add_to_subdomains_if_valid(subdomains_as_str=self._ret_subdomains_from_google())
+            
+            return self
 
     def get_rev_domains_for_ips(self):
         """
@@ -133,7 +138,7 @@ class Host(object):
                 ip.get_rev_domains()
         return self
 
-    def get_whois_domain(self, num=0):
+    def get_whois_domain(self):
         """
         Whois lookup on self.domain. Saved in self.whois_domain as string,
         since each top-level domain has a way of representing data.
@@ -149,6 +154,7 @@ class Host(object):
         except Exception as e:
             InstaRecon.error(e, sys._getframe().f_code.co_name)
             pass
+        return self
 
     def get_all_whois_ip(self):
         """
@@ -171,6 +177,7 @@ class Host(object):
                 cidrs_found[ip.cidr] = ip.whois_ip
 
         self.cidrs = set([ip.cidr for ip in self.ips if ip.cidr])
+        return self
 
     def get_all_shodan(self, key):
         """
@@ -180,6 +187,7 @@ class Host(object):
         if key:
             for ip in self.ips:
                 ip.get_shodan(key)
+        return self
 
     def _get_ips(self):
         """
@@ -190,7 +198,6 @@ class Host(object):
             ips = self._ret_host_by_name(self.domain)
             if ips:
                 self.ips = [IP(str(ip)) for ip in ips]
-        return self
 
     @staticmethod
     def _ret_host_by_name(name):
