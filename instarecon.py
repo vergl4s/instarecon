@@ -121,13 +121,26 @@ class Host(object):
 
     def google_lookups(self):
         """
-        Google queries to find related subdomains and linkedin pages. Testing.
+        Google queries to find related subdomains and linkedin pages.
         """
         if self.domain:
+
             self.linkedin_page = self._ret_linkedin_page_from_google(self.domain)
 
-            self._add_to_subdomains_if_valid(subdomains_as_str=self._ret_subdomains_from_google())
             
+            dict_with_results = None
+            google_rounds = _google_subdomains_lookup()
+
+            try:
+                while True:
+                    # Sleep some time between 0 - 4.999 seconds
+                    time.sleep(randint(0, 4) + randint(0, 1000) * 0.001)
+                    dict_with_results = next(google_rounds)
+
+            except StopIteration:
+                pass
+
+            self._add_to_subdomains_if_valid(subdomains_as_str=subdomains_discovered)        
             return self
 
     def get_rev_domains_for_ips(self):
@@ -255,12 +268,9 @@ class Host(object):
             Sub method that reaches out to google using the following query:
             site:*.domain -site:subdomain_to_avoid1 -site:subdomain_to_avoid2 -site:subdomain_to_avoid3...
 
-            Returns list of unique subdomain strings
+            Can only remove 8 domains from results using '-'. Returns list of unique subdomain strings
             """
-
-            # Sleep some time between 0 - 4.999 seconds
-            time.sleep(randint(0, 4) + randint(0, 1000) * 0.001)
-
+            asd
             request = 'http://google.com/search?hl=en&meta=&num=' + str(num) + '&start=' + str(counter) + '&q=' +\
                 'site%3A%2A' + domain
 
@@ -972,7 +982,7 @@ class InstaRecon(object):
                     # Using generator to get one csv line at a time (one Host can yield multiple lines)
                     generator = host.print_as_csv_lines()
                     while True:
-                        output_as_lines.append(generator.next())
+                        output_as_lines.append(next(generator))
 
                 except StopIteration:
                     # Space between targets
