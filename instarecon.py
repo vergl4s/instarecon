@@ -6,9 +6,9 @@ import re
 import sys
 import time
 from random import randint
+import itertools
 
 import ipaddress as ipa  # https://docs.python.org/3/library/ipaddress.html
-
 import dns.name  # http://www.dnspython.org/docs/1.12.0/
 import dns.resolver
 import dns.reversename
@@ -38,7 +38,7 @@ class Host(object):
     subdomains -- Set of Hosts for each related Host found that is a subdomain of self.domain
     linkedin_page -- Str of LinkedIn url that contains domain in html
     related_hosts -- Set of Hosts that may be related to host, as they're part of the same cidrs
-    cidrs -- set of ipa.Ipv4Networks for each ip.cidrs
+    cidrs -- set of ipa.IPv4Networks for each ip.cidrs
     urls -- set of urls found in google results
     """
 
@@ -146,7 +146,7 @@ class Host(object):
             pass
         return self
 
-    def get_all_whois_ip(self):
+    def get_whois_ip(self):
         """
         IP Whois lookups on each ip within self.ips
         Saved in each ip.whois_ip as dict, since this is how it is returned by ipwhois library.
@@ -157,9 +157,8 @@ class Host(object):
             cidr_found = False
             for cidr, whois_ip in cidrs_found.iteritems():
                 if ipa.ip_address(ip.ip.decode('unicode-escape')) in cidr:  # cidr already IPv4.Network obj
-                    # If cidr is already in Host, we won't get_whois_ip again.
-                    # Instead we will save cidr in ip just to make it easier to relate them later
-                    ip.cidrs.add(cidr)
+                    # If cidr is already in Host, we won't call get_whois_ip again.
+                    # Note cidr already found is not saved in new ips, as it isn't really necessary
                     ip.whois_ip = whois_ip
                     cidr_found = True
                     break
@@ -254,7 +253,6 @@ class Host(object):
         It returns a set of Hosts for each subdomain found in google
         Each Host will have dns_lookups() already callled, with possibly ips and rev_domains filled
         """
-        @staticmethod
         def _google_subdomain_lookup(domain, subdomains_to_avoid, num, counter):
             """
             Sub method that reaches out to google using the following query:
@@ -538,7 +536,7 @@ class Host(object):
         self.ns_dns_lookup()
         self.mx_dns_lookup()
         self.get_whois_domain()
-        self.get_all_whois_ip()
+        self.get_whois_ip()
         if shodan_key:
             self.get_all_shodan(shodan_key)
         self.google_lookups()
@@ -587,9 +585,8 @@ class Network(Host):
         else:
             yield ['No results']
 
-
 class IP(object):
-
+    
     """
     IP and information specific to it. Hosts contain multiple IPs,
     as a domain can resolve to multiple IPs.
@@ -652,14 +649,34 @@ class IP(object):
             if 'nets' in self.whois_ip:
                 if self.whois_ip['nets']:
                     cidrs = []
-                    
+
                     for net in self.whois_ip['nets']:
-                        net_cidrs = [cidr.rstrip().lstrip().decode('unicode-escape') for cidr in net['cidr'].split(',')]
+                        net_cidrs = [ipa.ip_network(cidr.rstrip().lstrip().decode('unicode-escape')) for cidr in net['cidr'].split(',') if cidr]
                         cidrs += net_cidrs
-                        
-                    for cidr in cidrs:
-                        self.cidrs.add = cidr
+
+                    self.cidrs = self._remove_overlaping_cidrs(cidrs)
         return self
+
+    @staticmethod
+    def _remove_overlaping_cidrs(cidrs):
+        """
+        Takes list of cidrs and removes duplicates or overlapping networks.
+        """
+        cidrs = set(cidrs)
+        # iter_cidrs won't be changed because it is used for iteration
+        iter_cidrs = [i for i in cidrs]
+        for a,b in itertools.combinations(iter_cidrs, 2):
+            if a.overlaps(b):
+                to_be_removed = None
+                if a.num_addresses>=b.num_addresses:
+                    to_be_removed = b
+                else:
+                    to_be_removed = a
+                try:
+                    cidrs.remove(to_be_removed)
+                except ValueError:
+                    pass
+        return cidrs
 
     def print_ip(self):
         ret = str(self.ip)
@@ -743,7 +760,7 @@ class IP(object):
 
 
 class InstaRecon(object):
-
+    
     """
     Holds all Host entries and manages scans, interpret user input, threads and outputs.
 
@@ -899,14 +916,15 @@ class InstaRecon(object):
             print '[*] Whois domain:'
             print host.whois_domain
 
-        host.get_all_whois_ip()
+        host.get_whois_ip()
         if fb:
-            m = host.print_all_whois_ip()
-            if m:
-                print ''
-                print '[*] Whois IP:'
-                print m
-
+            for ip in host.ips:
+                m = ip.print_whois_ip()
+                if m:
+                    print ''
+                    print '[*] Whois IP for '+str(ip)+':'
+                    print m
+                
         # Shodan lookup
         if self.shodan_key:
 
