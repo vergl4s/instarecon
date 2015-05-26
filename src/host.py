@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 from random import randint
-import re
+import sys
 import time
 
 import dns.name  # http://www.dnspython.org/docs/1.12.0/
-import dns.resolver
-import dns.reversename
 import ipaddress as ipa  # https://docs.python.org/3/library/ipaddress.html
-import pythonwhois as whois  # http://cryto.net/pythonwhois/usage.html https://github.com/joepie91/python-whois
-import requests
 
 from ip import IP
 import log
@@ -93,7 +89,7 @@ class Host(object):
         DNS lookup to find MX entries i.e. mail servers responsible for self.domain
         """
         if self.domain:
-            mx_list = self._ret_mx_by_name(self.domain)
+            mx_list = lookup.mx_dns(self.domain)
             if mx_list:
                 self.mx.update([Host(domain=mx).dns_lookups() for mx in mx_list])
                 self._add_to_subdomains_if_valid(subdomains_as_hosts=self.mx)
@@ -104,7 +100,7 @@ class Host(object):
         DNS lookup to find NS entries i.e. name/DNS servers responsible for self.domain
         """
         if self.domain:
-            ns_list = self._ret_ns_by_name(self.domain)
+            ns_list = lookup.ns_dns(self.domain)
             if ns_list:
                 self.ns.update([Host(domain=ns).dns_lookups() for ns in ns_list])
                 self._add_to_subdomains_if_valid(subdomains_as_hosts=self.ns)
@@ -127,7 +123,7 @@ class Host(object):
         """
         try:
             if self.domain:
-                query = whois.get_whois(self.domain)
+                query = lookup.whois_domain(self.domain)
 
                 if 'raw' in query:
                     self.whois_domain = query['raw'][0].split('<<<')[0].lstrip().rstrip()
@@ -177,143 +173,23 @@ class Host(object):
         Used internally by self.dns_lookups()
         """
         if self.domain and not self.ips:
-            ips = self._ret_host_by_name(self.domain)
+            ips = lookup.direct_dns(self.domain)
             if ips:
                 self.ips = [IP(str(ip)) for ip in ips]
 
-    @staticmethod
-    def _ret_host_by_name(name):
-        try:
-            return lookups.dns_resolver.query(name)
-        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.exception.Timeout) as e:
-            log.raise_error('[-] Host lookup failed for ' + name, sys._getframe().f_code.co_name)
-            pass
-
-    @staticmethod
-    def _ret_mx_by_name(name):
-        try:
-            # rdata.exchange for domains and rdata.preference for integer
-            return [str(mx.exchange).rstrip('.') for mx in lookups.dns_resolver.query(name, 'MX')]
-        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.exception.Timeout) as e:
-            log.raise_error('[-] MX lookup failed for ' + name, sys._getframe().f_code.co_name)
-            pass
-
-    @staticmethod
-    def _ret_ns_by_name(name):
-        try:
-            # rdata.exchange for domains and rdata.preference for integer
-            return [str(ns).rstrip('.') for ns in lookups.dns_resolver.query(name, 'NS')]
-        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.exception.Timeout) as e:
-            log.raise_error('[-] NS lookup failed for ' + name, sys._getframe().f_code.co_name)
-            pass
-
-    @staticmethod
-    def _ret_linkedin_page_from_google(name):
-        """
-        Uses a google query to find a possible LinkedIn page related to name (usually self.domain)
-
-        Google query is "site:linkedin.com/company name", and first result is used
-        """
-        try:
-            request = 'http://google.com/search?hl=en&meta=&num=10&q=site:linkedin.com/company%20"' + name + '"'
-            google_search = requests.get(request)
-            google_results = re.findall('<cite>(.+?)<\/cite>', google_search.text)
-            for url in google_results:
-                if 'linkedin.com/company/' in url:
-                    return re.sub('<.*?>', '', url)
-        except Exception as e:
-            log.raise_error(e, sys._getframe().f_code.co_name)
-    
     def google_lookups(self):
         """
         Google queries to find related subdomains and linkedin pages. Testing.
         """
         if self.domain:
-            self.linkedin_page = self._ret_linkedin_page_from_google(self.domain)
+            self.linkedin_page = lookup.google_linkedin_page(self.domain)
 
-            self._add_to_subdomains_if_valid(subdomains_as_str=self._ret_subdomains_from_google())
+            self._add_to_subdomains_if_valid(subdomains_as_str=lookup.google_subdomains(self.domain))
             
             # Sleep some time between 0 - 4.999 seconds
             time.sleep(randint(0, 4) + randint(0, 1000) * 0.001)
 
             return self
-
-    def _ret_subdomains_from_google(self):
-        """
-        This method uses google dorks to get as many subdomains from google as possible
-        It returns a set of Hosts for each subdomain found in google
-        Each Host will have dns_lookups() already callled, with possibly ips and rev_domains filled
-        """
-        def _google_subdomain_lookup(domain, subdomains_to_avoid, num, counter):
-            """
-            Sub method that reaches out to google using the following query:
-            site:*.domain -site:subdomain_to_avoid1 -site:subdomain_to_avoid2 -site:subdomain_to_avoid3...
-
-            Returns list of unique subdomain strings
-            """
-            request = 'http://google.com/search?hl=en&meta=&num=' + str(num) + '&start=' + str(counter) + '&q=' +\
-                'site%3A%2A' + domain
-
-            for subdomain in subdomains_to_avoid[:8]:
-                # Don't want to remove original name from google query
-                if subdomain != domain:
-                    request = ''.join([request, '%20%2Dsite%3A', str(subdomain)])
-
-            google_search = None
-            try:
-                google_search = requests.get(request)
-            except Exception as e:
-                Error.log(e, sys._getframe().f_code.co_name)
-
-            new_subdomains = set()
-            if google_search:
-                google_results = re.findall('<cite>(.+?)<\/cite>', google_search.text)
-
-                for url in set(google_results):
-                    # Removing html tags from inside url (sometimes they ise <b> or <i> for ads)
-                    url = re.sub('<.*?>', '', url)
-
-                    # Follows Javascript pattern of accessing URLs
-                    g_host = url
-                    g_protocol = ''
-                    g_pathname = ''
-
-                    temp = url.split('://')
-
-                    # If there is g_protocol e.g. http://, ftp://, etc
-                    if len(temp) > 1:
-                        g_protocol = temp[0]
-                        # remove g_protocol from url
-                        url = ''.join(temp[1:])
-
-                    temp = url.split('/')
-                    # if there is a pathname after host
-                    if len(temp) > 1:
-
-                        g_pathname = '/'.join(temp[1:])
-                        g_host = temp[0]
-
-                    new_subdomains.add(g_host)
-
-                # TODO do something with g_pathname and g_protocol
-                # Currently not using protocol or pathname for anything
-            return list(new_subdomains)
-
-        # Keeps subdomains found by _google_subdomains_lookup
-        subdomains_discovered = []
-        # Variable to check if there is any new result in the last iteration
-        subdomains_in_last_iteration = -1
-
-        while len(subdomains_discovered) > subdomains_in_last_iteration:
-
-            subdomains_in_last_iteration = len(subdomains_discovered)
-
-            subdomains_discovered += _google_subdomain_lookup(self.domain, subdomains_discovered, 100, 0)
-            subdomains_discovered = list(set(subdomains_discovered))
-
-        subdomains_discovered += _google_subdomain_lookup(self.domain, subdomains_discovered, 100, 100)
-        subdomains_discovered = list(set(subdomains_discovered))
-        return subdomains_discovered
 
     def _add_to_subdomains_if_valid(self, subdomains_as_str=None, subdomains_as_hosts=None):
         """
@@ -378,7 +254,7 @@ class Host(object):
 
                 while not this_scan_completed:
                     try:
-                        lookup_result = lookups.dns_resolver.query(dns.reversename.from_address(str(ip)), 'PTR')
+                        lookup_result = lookup.reverse_dns(str(ip))
                         this_scan_completed = True
                     except (dns.resolver.NXDOMAIN,
                             dns.resolver.NoAnswer,

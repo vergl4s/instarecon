@@ -17,52 +17,46 @@ class InstaRecon(object):
     Holds all Host entries and manages scans, interpret user input, threads and outputs.
 
     Keyword arguments:
-    feedback -- Bool flag for output printing. Static variable.
-    versobe -- Bool flag for verbose output printing. Static variable.
-    nameserver -- Str DNS server to be used for lookups (consumed by dns.resolver module)
-    shodan_key -- Str key used for Shodan lookups
-    targets -- Set of Hosts or Networks that will be scanned1
-    bad_targets -- Set of user inputs that could not be understood or resolved
+    nameserver -- Str DNS server to be used for lookups (consumed by dns.resolver module).
+    targets -- Set of Hosts or Networks that will be scanned.
+    bad_targets -- Set of user inputs that could not be understood or resolved.
+    versobe -- Bool flag for verbose output printing. Passed to logs.
+    shodan_key -- Str key used for Shodan lookups. Passed to lookups.
     """
     version = '0.1'
-    feedback = False
-    shodan_key = None
     entry_banner = '# InstaRecon v' + version + ' - by Luis Teixeira (teix.co)'
     exit_banner = '# Done'
 
-    def __init__(self, nameserver=None, timeout=None, shodan_key=None, feedback=False, verbose=False, dns_only=False):
-
-        InstaRecon.feedback = feedback
-        log.feedback = feedback
-        InstaRecon.verbose = verbose
-        log.verbose = verbose
-
-        InstaRecon.shodan_key = shodan_key
+    def __init__(self, nameserver=None, timeout=None, shodan_key=None, verbose=False, dns_only=False):
 
         if nameserver:
-            lookups.dns_resolver.nameservers = [nameserver]
+            lookup.dns_resolver.nameservers = [nameserver]
         if timeout:
-            lookups.dns_resolver.timeout = timeout
-            lookups.dns_resolver.lifetime = timeout
+            lookup.dns_resolver.timeout = timeout
+            lookup.dns_resolver.lifetime = timeout
         self.dns_only = dns_only
         self.targets = set()
         self.bad_targets = set()
+
+        log.feedback = True
+        log.verbose = verbose
+
+        lookup.shodan_key = shodan_key
 
     def populate(self, user_supplied_list):
         for user_supplied in user_supplied_list:
             self.add_host(user_supplied)
 
-        if self.feedback:
-            if not self.targets:
-                print '# No hosts to scan'
-            else:
-                print '# Scanning', str(len(self.targets)) + '/' + str(len(user_supplied_list)), 'hosts'
+        if not self.targets:
+            print '# No hosts to scan'
+        else:
+            print '# Scanning', str(len(self.targets)) + '/' + str(len(user_supplied_list)), 'hosts'
 
-                if not self.dns_only:
-                    if not self.shodan_key:
-                        print '# No Shodan key provided'
-                    else:
-                        print'# Shodan key provided -', self.shodan_key
+            if not self.dns_only:
+                if not lookup.shodan_key:
+                    print '# No Shodan key provided'
+                else:
+                    print'# Shodan key provided -', lookup.shodan_key
 
     def add_host(self, user_supplied):
         """
@@ -88,13 +82,12 @@ class InstaRecon(object):
 
         # Test if user_supplied is a valid DNS?
         try:
-            ips = lookups.dns_resolver.query(user_supplied)
+            ips = lookup.dns_resolver.query(user_supplied)
             self.targets.add(Host(domain=user_supplied, ips=[str(ip) for ip in ips]))
             return
         except (dns.resolver.NXDOMAIN, dns.exception.SyntaxError) as e:
             # If here so results from network won't be so verbose
-            if InstaRecon.feedback:
-                print '[-] Couldn\'t resolve or understand -', user_supplied
+            print '[-] Couldn\'t resolve or understand -', user_supplied
             pass
 
         self.bad_targets.add(user_supplied)
@@ -111,131 +104,112 @@ class InstaRecon(object):
 
     def reverse_dns_on_network(self, network):
         """Does reverse dns lookups on a network object"""
-        fb = self.feedback
-        if fb:
-            print ''
-            print '# _____________ Reverse DNS lookups on {} _____________ #'.format(str(network))
+        print ''
+        print '# _____________ Reverse DNS lookups on {} _____________ #'.format(str(network))
 
-        network.reverse_lookup_on_related_cidrs(fb)
+        network.reverse_lookup_on_related_cidrs(True)
 
     def full_scan_on_host(self, host):
         """Does all possible scans for host"""
-        fb = self.feedback
-
-        if fb:
-            print ''
-            print '# ____________________ Scanning {} ____________________ #'.format(str(host))
+        print ''
+        print '# ____________________ Scanning {} ____________________ #'.format(str(host))
 
         # DNS and Whois lookups
-        if fb:
-            print ''
-            print '# DNS lookups'
+        print ''
+        print '# DNS lookups'
 
         host.dns_lookups()
-        if fb:
-            if host.domain:
-                print '[*] Domain: ' + host.domain
+        if host.domain:
+            print '[*] Domain: ' + host.domain
 
-            # IPs and reverse domains
-            if host.ips:
-                print ''
-                print '[*] IPs & reverse DNS: '
-                print host.print_all_ips()
+        # IPs and reverse domains
+        if host.ips:
+            print ''
+            print '[*] IPs & reverse DNS: '
+            print host.print_all_ips()
 
         host.ns_dns_lookup()
         # NS records
-        if host.ns and fb:
+        if host.ns:
             print ''
             print '[*] NS records:'
             print host.print_all_ns()
 
         host.mx_dns_lookup()
         # MX records
-        if host.mx and fb:
+        if host.mx:
             print ''
             print '[*] MX records:'
             print host.print_all_mx()
 
-        if fb:
-            print ''
-            print '# Whois lookups'
+        print ''
+        print '# Whois lookups'
 
         host.get_whois_domain()
-        if host.whois_domain and fb:
+        if host.whois_domain:
             print ''
             print '[*] Whois domain:'
             print host.whois_domain
 
         host.get_whois_ip()
-        if fb:
-            for ip in host.ips:
-                m = ip.print_whois_ip()
-                if m:
-                    print ''
-                    print '[*] Whois IP for '+str(ip)+':'
-                    print m
+        for ip in host.ips:
+            m = ip.print_whois_ip()
+            if m:
+                print ''
+                print '[*] Whois IP for '+str(ip)+':'
+                print m
                 
         # Shodan lookup
-        if self.shodan_key:
+        if lookup.shodan_key:
 
-            if fb:
-                print ''
-                print '# Querying Shodan for open ports'
+            print ''
+            print '# Querying Shodan for open ports'
 
-            host.get_all_shodan(self.shodan_key)
+            host.get_all_shodan(lookup.shodan_key)
 
-            if fb:
-                m = host.print_all_shodan()
-                if m:
-                    print '[*] Shodan:'
-                    print m
+            m = host.print_all_shodan()
+            if m:
+                print '[*] Shodan:'
+                print m
 
         # Google subdomains lookup
         if host.domain:
-            if fb:
-                print ''
-                print '# Querying Google for subdomains and Linkedin pages, this might take a while'
+            print ''
+            print '# Querying Google for subdomains and Linkedin pages, this might take a while'
 
             host.google_lookups()
 
-            if fb:
-                if host.linkedin_page:
-                    print '[*] Possible LinkedIn page: ' + host.linkedin_page
+            if host.linkedin_page:
+                print '[*] Possible LinkedIn page: ' + host.linkedin_page
 
-                if host.subdomains:
-                    print '[*] Subdomains:' + '\n' + host.print_subdomains()
-                else:
-                    print '[-] Error: No subdomains found in Google. If you are scanning a lot, Google might be blocking your requests.'
+            if host.subdomains:
+                print '[*] Subdomains:' + '\n' + host.print_subdomains()
+            else:
+                print '[-] Error: No subdomains found in Google. If you are scanning a lot, Google might be blocking your requests.'
 
         # DNS lookups on entire CIDRs taken from host.get_whois_ip()
         if host.cidrs:
-            if fb:
-                print ''
-                print '# Reverse DNS lookup on range {}'.format(', '.join([str(cidr) for cidr in host.cidrs]))
+            print ''
+            print '# Reverse DNS lookup on range {}'.format(', '.join([str(cidr) for cidr in host.cidrs]))
             host.reverse_lookup_on_related_cidrs(feedback=True)
 
     def dns_scan_on_host(self, host):
         """Does only direct and reverse DNS lookups for host"""
-        fb = self.feedback
 
-        if fb:
-            print ''
-            print '# _________________ DNS lookups on {} _________________ #'.format(str(host))
+        print ''
+        print '# _________________ DNS lookups on {} _________________ #'.format(str(host))
 
         host.dns_lookups()
-        if fb:
-            if host.domain:
-                print ''
-                print host.print_dns_only()
+        if host.domain:
+            print ''
+            print host.print_dns_only()
 
     def write_output_csv(self, filename=None):
         """Writes output for each target as csv in filename"""
         if filename:
             filename = os.path.expanduser(filename)
-            fb = self.feedback
 
-            if fb:
-                print '# Saving output csv file'
+            print '# Saving output csv file'
 
             output_as_lines = []
 
@@ -264,8 +238,7 @@ class InstaRecon(object):
 
                 except Exception as e:
                     error = '[-] Something went wrong, can\'t open output file. Press anything to try again.'
-                    if self.verbose:
-                        error = ''.join([error, '\nError: ', str(e)])
+                    error = ''.join([error, '\nError: ', str(e)])
                     raw_input(error)
 
                 except KeyboardInterrupt:
@@ -296,7 +269,6 @@ if __name__ == '__main__':
     scan = InstaRecon(
         nameserver=args.nameserver,
         shodan_key=shodan_key,
-        feedback=True,
         verbose=args.verbose,
         dns_only=args.dns_only,
     )

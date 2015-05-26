@@ -1,13 +1,9 @@
 #!/usr/bin/env python
-import sys
 import itertools
+import sys
 import time
 
 import ipaddress as ipa  # https://docs.python.org/3/library/ipaddress.html
-from ipwhois import IPWhois as ipw  # https://pypi.python.org/pypi/ipwhois
-import shodan  # https://shodan.readthedocs.org/en/latest/index.html
-import dns.resolver
-import dns.reversename
 
 import lookups
 import log
@@ -43,33 +39,18 @@ class IP(object):
     def __eq__(self, other):
         return self.ip == other.ip
 
-    @staticmethod
-    def _ret_host_by_ip(ip):
-        try:
-            return lookups.dns_resolver.query(dns.reversename.from_address(ip), 'PTR')
-        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.exception.Timeout) as e:
-            log.raise_error('[-] Host lookup failed for ' + ip, sys._getframe().f_code.co_name)
-
     def get_rev_domains(self):
         rev_domains = None
-        rev_domains = self._ret_host_by_ip(self.ip)
+        rev_domains = lookup.reverse_dns(self.ip)
         if rev_domains:
             self.rev_domains = [str(domain).rstrip('.') for domain in rev_domains]
         return self
 
-    def get_shodan(self, key):
-        try:
-            shodan_api_key = key
-            api = shodan.Shodan(shodan_api_key)
-            self.shodan = api.host(str(self))
-        except Exception as e:
-            Error.log(e, sys._getframe().f_code.co_name)
+    def get_shodan(self):
+        self.shodan = lookup.shodan(str(self))
 
     def get_whois_ip(self):
-        try:
-            self.whois_ip = ipw(str(self)).lookup() or None
-        except Exception as e:
-            Error.log(e, sys._getframe().f_code.co_name)
+        self.whois_ip = lookup.whois_ip(str(self))
 
         if self.whois_ip:
             if 'nets' in self.whois_ip:
