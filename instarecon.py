@@ -8,7 +8,8 @@ import ipaddress as ipa  # https://docs.python.org/3/library/ipaddress.html
 import dns.resolver
 
 from src.ip import IP
-from src.host import Host, Network
+from src.host import Host
+from src.network import Network
 from src import lookup
 from src import log
 
@@ -24,7 +25,7 @@ class InstaRecon(object):
     shodan_key -- Str key used for Shodan lookups. Passed to lookups.
     """
     __version__ = '0.1'
-    entry_banner = '# InstaRecon v' + version + ' - by Luis Teixeira (teix.co)'
+    entry_banner = '# InstaRecon v' + __version__ + ' - by Luis Teixeira (teix.co)'
     exit_banner = '# Done'
 
     def __init__(self, nameserver=None, timeout=None, shodan_key=None, verbose=False, dns_only=False):
@@ -65,13 +66,13 @@ class InstaRecon(object):
         """
         # Test if user_supplied is an IP?
         try:
-            self.targets.add(Host(ips=[str(ip)]))
+            self.targets.add(Host(ips=[user_supplied]))
             return
         except ValueError as e:
             pass
 
         try:
-            self.targets.add(Network([net]))
+            self.targets.add(Network(user_supplied))
             return
         except ValueError as e:
             pass
@@ -96,17 +97,20 @@ class InstaRecon(object):
             elif type(target) is Network:
                 self.reverse_dns_on_network(target)
 
-    def reverse_dns_on_network(self, network):
+    @staticmethod
+    def reverse_dns_on_network(network):
         """Does reverse dns lookups on a network object"""
         print ''
         print '# _____________ Reverse DNS lookups on {} _____________ #'.format(str(network))
 
         network.reverse_lookup_on_related_cidrs(True)
 
-    def full_scan_on_host(self, host):
+    @staticmethod
+    def full_scan_on_host(host):
         """Does all possible scans for host"""
+        
         print ''
-        print '# ____________________ Scanning {} ____________________ #'.format(str(host))
+        print '# ____________________ Scanning {} {} ____________________ #'.format(host.type,str(host))
 
         # DNS and Whois lookups
         print ''
@@ -159,7 +163,7 @@ class InstaRecon(object):
             print ''
             print '# Querying Shodan for open ports'
 
-            host.get_all_shodan(lookup.shodan_key)
+            host.get_all_shodan()
 
             m = host.print_all_shodan()
             if m:
@@ -187,7 +191,8 @@ class InstaRecon(object):
             print '# Reverse DNS lookup on range {}'.format(', '.join([str(cidr) for cidr in host.cidrs]))
             host.reverse_lookup_on_related_cidrs(feedback=True)
 
-    def dns_scan_on_host(self, host):
+    @staticmethod
+    def dns_scan_on_host(host):
         """Does only direct and reverse DNS lookups for host"""
 
         print ''

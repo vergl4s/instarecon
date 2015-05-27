@@ -1,14 +1,16 @@
 #!/usr/bin/env python
+from random import randint
 import re
 import sys
+import time
 
 import dns.resolver
-import dns.resolver
 import dns.reversename
+import ipaddress as ipa  # https://docs.python.org/3/library/ipaddress.html
 from ipwhois import IPWhois as ipw  # https://pypi.python.org/pypi/ipwhois
 import pythonwhois as whois  # http://cryto.net/pythonwhois/usage.html https://github.com/joepie91/python-whois
 import requests
-import shodan  # https://shodan.readthedocs.org/en/latest/index.html
+import shodan  as shodan_api# https://shodan.readthedocs.org/en/latest/index.html
 
 import log
 
@@ -45,8 +47,10 @@ def ns_dns(name):
 
 def whois_domain(name):
     try:
-        return whois.get_whois(name)
-    except Exception, e:
+        query = whois.get_whois(name)
+        if 'raw' in query:
+            return query['raw'][0].split('<<<')[0].lstrip().rstrip()
+    except Exception as e:
         log.raise_error('[-] NS lookup failed for ' + name, sys._getframe().f_code.co_name)
 
 def whois_ip(ip):
@@ -57,55 +61,40 @@ def whois_ip(ip):
 
 def shodan(ip):
     try:
-        api = shodan.Shodan(shodan_key)
-        return api.host(str(self))
+        api = shodan_api.Shodan(shodan_key)
+        return api.host(str(ip))
     except Exception as e:
         log.raise_error(e, sys._getframe().f_code.co_name)    
 
-def rev_dns_on_cidr(cidr, feedback=False):
+def rev_dns_on_cidr(cidr):
     """
     Reverse DNS lookups on each IP within a CIDR. 
-
-    cidr needs to be ipa.IPv4Networks
+    cidr needs to be ipa.IPv4Networks.
+    Yields tuple(ip, reverse_domains)
     """
-    if not isinstance(cidr, ipa.IPv4Networks):
+    if not isinstance(cidr, ipa.IPv4Network):
        raise ValueError
-    
-    for ip in cidr:
-        # Holds lookup results
-        lookup_result = None
-        # Used to repeat same scan if user issues KeyboardInterrupt
-        this_scan_completed = False
+    else:
+        for ip in cidr:
+            # Holds lookup results
+            lookup_result = None
+            # Used to repeat same scan if user issues KeyboardInterrupt
+            this_scan_completed = False
 
-        while not this_scan_completed:
-            try:
-                lookup_result = lookup.reverse_dns(str(ip))
-                this_scan_completed = True
-            except (dns.resolver.NXDOMAIN,
-                    dns.resolver.NoAnswer,
-                    dns.resolver.NoNameservers,
-                    dns.exception.Timeout) as e:
-                this_scan_completed = True
-            except KeyboardInterrupt:
+            while not this_scan_completed:
+                try:
+                    lookup_result = reverse_dns(str(ip))
+                    this_scan_completed = True
+                except (dns.resolver.NXDOMAIN,
+                        dns.resolver.NoAnswer,
+                        dns.resolver.NoNameservers,
+                        dns.exception.Timeout) as e:
+                    this_scan_completed = True
 
-
-            if lookup_result:
-                # Organizing reverse lookup results
-                reverse_domains = [str(domain).rstrip('.') for domain in lookup_result]
-                # Creating new host
-                new_host = Host(ips=[ip], reverse_domains=reverse_domains)
-
-                # Append host to current host self.related_hosts
-                self.related_hosts.add(new_host)
-
-                # Don't want to do this in case self is Network
-                if type(self) is Host:
-                    # Adds new_host to self.subdomains if new_host indeed is subdomain
-                    self._add_to_subdomains_if_valid(subdomains_as_hosts=[new_host])
-
-                if feedback:
-                    print new_host.print_all_ips()
-
+                if lookup_result:
+                    # Organizing reverse lookup results
+                    reverse_domains = [str(domain).rstrip('.') for domain in lookup_result]
+                    yield ip, reverse_domains
 
 def google_linkedin_page(name):
     """

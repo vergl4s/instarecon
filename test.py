@@ -19,35 +19,54 @@ class HostTestCase(unittest.TestCase):
             'sucuri.net',
         ]
         cls.host = Host(random.choice(possible_hosts))
-        print '# Testing {}'.format(str(cls.host))
+        print '\n# Testing {} {}'.format(cls.host.type, str(cls.host))
         cls.host.dns_lookups()
         cls.host.get_whois_domain()
         cls.host.get_whois_ip()
 
+    def test_property_types(self):
+        self.assertIsInstance(self.host.domain, str)
+        [ self.assertIsInstance(ip, IP) for ip in self.host.ips ]
+        self.assertIsInstance(self.host.ips, list)
+        self.assertIsInstance(self.host.whois_domain, unicode)
+        self.assertIsInstance(self.host.cidrs,set)
+        [self.assertIsInstance(cidr, ipaddress.IPv4Network) for cidr in self.host.cidrs]
+            
     def test_whois_domain(self):
         self.assertTrue(self.host.whois_domain)
-        self.assertIsInstance(self.host.whois_domain, unicode)
-
-    def test_cidrs_are_IPv4Network(self):
-        self.assertIsInstance(self.host.cidrs,set)
-        for cidr in self.host.cidrs:
-            self.assertIsInstance(cidr, ipaddress.IPv4Network)
-
-        for ip in self.host.ips:
-            self.assertIsInstance(ip.cidrs,set)
-            for cidr in ip.cidrs:
-                self.assertIsInstance(cidr, ipaddress.IPv4Network)
 
     def test_cidrs_dont_overlap(self):
         for a,b in itertools.combinations(self.host.cidrs,2):
             self.assertFalse(a.overlaps(b))
 
-    def test_reverse_dns_lookup(self):
-        pass
-
 class IPTestCase(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        possible_ips = [
+            '8.8.8.8',
+            '8.8.4.4',
+            '4.2.2.2',
+            '139.130.4.5',
+        ]
+        cls.ip = IP(random.choice(possible_ips))
+        cls.ip.get_rev_domains()
+        cls.ip.get_whois_ip()
+        print '\n# Testing IP {}'.format(str(cls.ip))
     
-    def test_ip_remove_overlapping_cidr_func(self):
+    def test_property_types(self):
+        self.assertIsInstance(self.ip.ip, str)
+        self.assertIsInstance(self.ip.rev_domains, list)
+        self.assertIsInstance(self.ip.whois_ip, dict)
+        self.assertIsInstance(self.ip.cidrs, set)
+        [self.assertIsInstance(cidr, ipaddress.IPv4Network) for cidr in self.ip.cidrs]
+
+    def test_ip_remove_overlapping_cidr_function(self):
+        """
+        Test function that removes overlapping cidrs
+        Used in case whois_ip results
+        contain cidrs 
+        """
         cidrs = [
             ipa.ip_network(u'54.192.0.0/12'),
             ipa.ip_network(u'54.206.0.0/16'), #overlaps and is smaller than '54.192.0.0/12'
@@ -60,16 +79,18 @@ class IPTestCase(unittest.TestCase):
 
 class NetworkTestCase(unittest.TestCase):
 
+    @classmethod
     def setUpClass(cls):
         cls.network = Network('8.8.8.0/27')
-        print '# Testing {}'.format(str(cls.host))
+        print '\n# Testing Network {}'.format(str(cls.network))
+
+    def test_property_types(self):
+        self.assertIsInstance(self.network.cidr, ipaddress.IPv4Network)
+        self.assertIsInstance(self.network.related_hosts, set)
 
     def test_reverse_dns_lookup(self):
-        cls.network.reverse_lookup_on_related_cidrs()
-        self.assertTrue(cls.network.related_hosts)
-
-    def test_cidr_is_IPv4Network(self):
-        self.assertIsInstance(cidr, ipaddress.IPv4Network)
+        self.network.reverse_lookup_on_related_cidrs()
+        self.assertTrue(self.network.related_hosts)
 
 if __name__ == '__main__':
     unittest.main()

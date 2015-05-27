@@ -1,8 +1,4 @@
 #!/usr/bin/env python
-from random import randint
-import sys
-import time
-
 import dns.name  # http://www.dnspython.org/docs/1.12.0/
 import ipaddress as ipa  # https://docs.python.org/3/library/ipaddress.html
 
@@ -34,13 +30,19 @@ class Host(object):
     """
 
     def __init__(self, domain=None, ips=(), reverse_domains=()):
+        self.domain = None
+        self.ips = []
+
         # Type check - depends on what parameters have been passed
         if domain:
             self.type = 'domain'
 
-            #Check if domain can be resolved and raise ValueError if it can't
-            self.domain = lookup.direct_dns(domain)
-            if not self.domain:
+            self.domain = domain
+            self._get_ips()
+
+            # Check if domain can be resolved
+            if not self.ips:
+                # Couldn't resolve domain
                 raise ValueError
 
         elif ips:
@@ -87,9 +89,18 @@ class Host(object):
         """
         if self.type == 'domain':
             self._get_ips()
-        for ip in self.ips:
-            ip.get_rev_domains()
+        self.get_rev_domains_for_ips()
         return self
+    
+    def _get_ips(self):
+        """
+        Does direct DNS lookup to get IPs from self.domains.
+        Used internally by self.dns_lookups()
+        """
+        if self.domain and not self.ips:
+            ips = lookup.direct_dns(self.domain)
+            if ips:
+                self.ips = [IP(str(ip)) for ip in ips]
 
     def mx_dns_lookup(self):
         """
@@ -128,16 +139,8 @@ class Host(object):
         since each top-level domain has a way of representing data.
         This makes it hard to index it, almost a project on its on.
         """
-        try:
-            if self.domain:
-                query = lookup.whois_domain(self.domain)
-
-                if 'raw' in query:
-                    self.whois_domain = query['raw'][0].split('<<<')[0].lstrip().rstrip()
-
-        except Exception as e:
-            log.raise_error(e, sys._getframe().f_code.co_name)
-            pass
+        if self.domain:
+            self.whois_domain = lookup.whois_domain(self.domain)
         return self
 
     def get_whois_ip(self):
@@ -164,25 +167,14 @@ class Host(object):
         self.cidrs = set([cidr for cidr in cidrs_found if cidr])
         return self
 
-    def get_all_shodan(self, key):
+    def get_all_shodan(self):
         """
         Shodan lookups for each ip within self.ips.
         Saved in ip.shodan as dict.
         """
-        if key:
-            for ip in self.ips:
-                ip.get_shodan(key)
+        for ip in self.ips:
+            ip.get_shodan()
         return self
-
-    def _get_ips(self):
-        """
-        Does direct DNS lookup to get IPs from self.domains.
-        Used internally by self.dns_lookups()
-        """
-        if self.domain and not self.ips:
-            ips = lookup.direct_dns(self.domain)
-            if ips:
-                self.ips = [IP(str(ip)) for ip in ips]
 
     def google_lookups(self):
         """
@@ -249,19 +241,27 @@ class Host(object):
         Will be used to check for subdomains found through reverse lookup
         """
         for cidr in self.cidrs:
-            generator = lookup.rev_dns_on_cidr(cidr, feedback=True)
+            
+            generator = lookup.rev_dns_on_cidr(cidr)
             
             while True:
                 try:
-                    generator.next()
+
+                    ip, reverse_domains = generator.next()
+                    new_host = Host(ips=[ip], reverse_domains=reverse_domains)
+                    self.related_hosts.add(new_host)
+
+                    # Adds new_host to self.subdomains if new_host is subdomain
+                    self._add_to_subdomains_if_valid(subdomains_as_hosts=[new_host])
+
+                    if feedback:
+                        print new_host.print_all_ips()
+
                 except StopIteration:
                     break
                 except KeyboardInterrupt:
-                    if isinstance(self, Network):
-                        raise KeyboardInterrupt
-                    else:
-                        if raw_input('[-] Sure you want to stop scanning ' + str(cidr) +
-                                     '? Program flow will continue normally. (y/N):') in ['Y', 'y']:
+                    if raw_input('[-] Sure you want to stop scanning ' + str(cidr) +
+                                 '? Program flow will continue normally. (y/N):') in ['Y', 'y']:
                         return
 
         if not self.related_hosts:
@@ -386,44 +386,3 @@ class Host(object):
             self.get_all_shodan(shodan_key)
         self.google_lookups()
 
-class Network(Host):
-    """
-    Subclass of Host that represents an IP network to be scanned.
-
-    Keywork arguments:
-    cidrs -- set of IPv4Networks to be scanned
-    related_hosts -- set of valid Hosts found by scanning each cidr in cidrs
-    """
-
-    def __init__(self, cidr):
-        """
-        cidr parameter should be an ipaddress.IPv4Network
-        """
-        if not cidr:
-            raise ValueError
-        # Raises ValueError if cidr is not a valid network
-        self.cidr = ipa.ip_network(cidr.decode('unicode-escape'), strict = False)
-        self.related_hosts = set()
-
-    def __str__(self):
-        return ','.join([str(cidr) for cidr in self.cidrs])
-
-    def __hash__(self):
-        return hash(('cidrs', ','.join([str(cidr) for cidr in self.cidrs])))
-
-    def __eq__(self, other):
-        return self.cidrs == other.cidrs
-
-    def print_as_csv_lines(self):
-        """Overrides method from Host. Yields each Host in related_hosts as csv line"""
-        yield ['Target: ' + ', '.join([str(cidr) for cidr in self.cidrs])]
-
-        if self.related_hosts:
-            yield ['IP', 'Reverse domains', ]
-            for host in self.related_hosts:
-                yield [
-                    ', '.join([str(ip) for ip in host.ips]),
-                    ', '.join([', '.join(ip.rev_domains) for ip in host.ips]),
-                ]
-        else:
-            yield ['No results']
