@@ -9,7 +9,7 @@ import dns.resolver
 
 from src.ip import IP
 from src.host import Host, Network
-from src import lookups
+from src import lookup
 from src import log
 
 class InstaRecon(object):
@@ -23,7 +23,7 @@ class InstaRecon(object):
     versobe -- Bool flag for verbose output printing. Passed to logs.
     shodan_key -- Str key used for Shodan lookups. Passed to lookups.
     """
-    version = '0.1'
+    __version__ = '0.1'
     entry_banner = '# InstaRecon v' + version + ' - by Luis Teixeira (teix.co)'
     exit_banner = '# Done'
 
@@ -60,21 +60,17 @@ class InstaRecon(object):
 
     def add_host(self, user_supplied):
         """
-        Add string passed by user to self.targets as proper Host objects
-        For this, it parses user_supplied strings to separate IPs, Domains, and Networks.
+        Add string passed by user to self.targets as proper Host/Network objects
+        For this, it attempts to create these objects and moves on if got a ValueError.
         """
         # Test if user_supplied is an IP?
         try:
-            ip = ipa.ip_address(user_supplied.decode('unicode-escape'))
-            # if not (ip.is_multicast or ip.is_unspecified or ip.is_reserved or ip.is_loopback):
             self.targets.add(Host(ips=[str(ip)]))
             return
         except ValueError as e:
             pass
 
-        # Test if user_supplied is a valid network range?
         try:
-            net = ipa.ip_network(user_supplied.decode('unicode-escape'), strict=False)
             self.targets.add(Network([net]))
             return
         except ValueError as e:
@@ -82,11 +78,9 @@ class InstaRecon(object):
 
         # Test if user_supplied is a valid DNS?
         try:
-            ips = lookup.dns_resolver.query(user_supplied)
-            self.targets.add(Host(domain=user_supplied, ips=[str(ip) for ip in ips]))
+            self.targets.add(Host(domain=user_supplied))
             return
-        except (dns.resolver.NXDOMAIN, dns.exception.SyntaxError) as e:
-            # If here so results from network won't be so verbose
+        except ValueError as e:
             print '[-] Couldn\'t resolve or understand -', user_supplied
             pass
 

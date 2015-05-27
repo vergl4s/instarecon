@@ -20,7 +20,7 @@ shodan_key = None
 def direct_dns(name):
     try:
         return dns_resolver.query(name)
-    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.exception.Timeout) as e:
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.exception.Timeout, dns.exception.SyntaxError) as e:
         log.raise_error('[-] Host lookup failed for ' + name, sys._getframe().f_code.co_name)
 
 def reverse_dns(ip):
@@ -62,6 +62,51 @@ def shodan(ip):
     except Exception as e:
         log.raise_error(e, sys._getframe().f_code.co_name)    
 
+def rev_dns_on_cidr(cidr, feedback=False):
+    """
+    Reverse DNS lookups on each IP within a CIDR. 
+
+    cidr needs to be ipa.IPv4Networks
+    """
+    if not isinstance(cidr, ipa.IPv4Networks):
+       raise ValueError
+    
+    for ip in cidr:
+        # Holds lookup results
+        lookup_result = None
+        # Used to repeat same scan if user issues KeyboardInterrupt
+        this_scan_completed = False
+
+        while not this_scan_completed:
+            try:
+                lookup_result = lookup.reverse_dns(str(ip))
+                this_scan_completed = True
+            except (dns.resolver.NXDOMAIN,
+                    dns.resolver.NoAnswer,
+                    dns.resolver.NoNameservers,
+                    dns.exception.Timeout) as e:
+                this_scan_completed = True
+            except KeyboardInterrupt:
+
+
+            if lookup_result:
+                # Organizing reverse lookup results
+                reverse_domains = [str(domain).rstrip('.') for domain in lookup_result]
+                # Creating new host
+                new_host = Host(ips=[ip], reverse_domains=reverse_domains)
+
+                # Append host to current host self.related_hosts
+                self.related_hosts.add(new_host)
+
+                # Don't want to do this in case self is Network
+                if type(self) is Host:
+                    # Adds new_host to self.subdomains if new_host indeed is subdomain
+                    self._add_to_subdomains_if_valid(subdomains_as_hosts=[new_host])
+
+                if feedback:
+                    print new_host.print_all_ips()
+
+
 def google_linkedin_page(name):
     """
     Uses a google query to find a possible LinkedIn page related to name (usually self.domain)
@@ -99,6 +144,9 @@ def google_subdomains(name):
             if subdomain != domain:
                 request = ''.join([request, '%20%2Dsite%3A', str(subdomain)])
 
+        # Sleep some time between 0 - 4.999 seconds
+        time.sleep(randint(0, 4) + randint(0, 1000) * 0.001)
+        
         google_search = None
         try:
             google_search = requests.get(request)

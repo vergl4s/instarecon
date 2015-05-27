@@ -42,6 +42,9 @@ class HostTestCase(unittest.TestCase):
         for a,b in itertools.combinations(self.host.cidrs,2):
             self.assertFalse(a.overlaps(b))
 
+    def test_reverse_dns_lookup(self):
+        pass
+
 class IPTestCase(unittest.TestCase):
     
     def test_ip_remove_overlapping_cidr_func(self):
@@ -54,6 +57,19 @@ class IPTestCase(unittest.TestCase):
             ipa.ip_network(u'8.8.8.128/25'), #overlaps and is smaller than '8.8.8.0/24'
         ]
         self.assertEquals(len(IP._remove_overlaping_cidrs(cidrs)),4)
+
+class NetworkTestCase(unittest.TestCase):
+
+    def setUpClass(cls):
+        cls.network = Network('8.8.8.0/27')
+        print '# Testing {}'.format(str(cls.host))
+
+    def test_reverse_dns_lookup(self):
+        cls.network.reverse_lookup_on_related_cidrs()
+        self.assertTrue(cls.network.related_hosts)
+
+    def test_cidr_is_IPv4Network(self):
+        self.assertIsInstance(cidr, ipaddress.IPv4Network)
 
 if __name__ == '__main__':
     unittest.main()

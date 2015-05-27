@@ -5,7 +5,7 @@ import time
 
 import ipaddress as ipa  # https://docs.python.org/3/library/ipaddress.html
 
-import lookups
+import lookup
 import log
 
 class IP(object):
@@ -21,9 +21,11 @@ class IP(object):
     shodan -- Dict containing Shodan results
     """
 
-    def __init__(self, ip, rev_domains=None):
-        if rev_domains is None:
-            rev_domains = []
+    def __init__(self, ip, rev_domains=()):
+        
+        #Will raise an exception in case ip is not a valid address
+        ipa.ip_address(ip.decode('unicode-escape'))
+        
         self.ip = str(ip)
         self.rev_domains = rev_domains
         self.whois_ip = {}

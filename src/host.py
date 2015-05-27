@@ -8,7 +8,7 @@ import ipaddress as ipa  # https://docs.python.org/3/library/ipaddress.html
 
 from ip import IP
 import log
-import lookups
+import lookup
 
 class Host(object):
     """
@@ -37,13 +37,20 @@ class Host(object):
         # Type check - depends on what parameters have been passed
         if domain:
             self.type = 'domain'
+
+            #Check if domain can be resolved and raise ValueError if it can't
+            self.domain = lookup.direct_dns(domain)
+            if not self.domain:
+                raise ValueError
+
         elif ips:
             self.type = 'ip'
+            
+            # IP raises ValueError if passed an invalid value
+            self.ips = [IP(str(ip), reverse_domains) for ip in ips]
         else:
             raise ValueError
 
-        self.domain = domain
-        self.ips = [IP(str(ip), reverse_domains) for ip in ips]
         self.mx = set()
         self.ns = set()
         self.whois_domain = None
@@ -185,9 +192,6 @@ class Host(object):
             self.linkedin_page = lookup.google_linkedin_page(self.domain)
 
             self._add_to_subdomains_if_valid(subdomains_as_str=lookup.google_subdomains(self.domain))
-            
-            # Sleep some time between 0 - 4.999 seconds
-            time.sleep(randint(0, 4) + randint(0, 1000) * 0.001)
 
             return self
 
@@ -245,46 +249,20 @@ class Host(object):
         Will be used to check for subdomains found through reverse lookup
         """
         for cidr in self.cidrs:
-            for ip in cidr:
-
-                # Holds lookup results
-                lookup_result = None
-                # Used to repeat same scan if user issues KeyboardInterrupt
-                this_scan_completed = False
-
-                while not this_scan_completed:
-                    try:
-                        lookup_result = lookup.reverse_dns(str(ip))
-                        this_scan_completed = True
-                    except (dns.resolver.NXDOMAIN,
-                            dns.resolver.NoAnswer,
-                            dns.resolver.NoNameservers,
-                            dns.exception.Timeout) as e:
-                        this_scan_completed = True
-                    except KeyboardInterrupt:
-                        if isinstance(self, Network):
-                            raise KeyboardInterrupt
-                        else:
-                            if raw_input('[-] Sure you want to stop scanning ' + str(cidr) +
-                                         '? Program flow will continue normally. (y/N):') in ['Y', 'y']:
-                                return
-
-                    if lookup_result:
-                        # Organizing reverse lookup results
-                        reverse_domains = [str(domain).rstrip('.') for domain in lookup_result]
-                        # Creating new host
-                        new_host = Host(ips=[ip], reverse_domains=reverse_domains)
-
-                        # Append host to current host self.related_hosts
-                        self.related_hosts.add(new_host)
-
-                        # Don't want to do this in case self is Network
-                        if type(self) is Host:
-                            # Adds new_host to self.subdomains if new_host indeed is subdomain
-                            self._add_to_subdomains_if_valid(subdomains_as_hosts=[new_host])
-
-                        if feedback:
-                            print new_host.print_all_ips()
+            generator = lookup.rev_dns_on_cidr(cidr, feedback=True)
+            
+            while True:
+                try:
+                    generator.next()
+                except StopIteration:
+                    break
+                except KeyboardInterrupt:
+                    if isinstance(self, Network):
+                        raise KeyboardInterrupt
+                    else:
+                        if raw_input('[-] Sure you want to stop scanning ' + str(cidr) +
+                                     '? Program flow will continue normally. (y/N):') in ['Y', 'y']:
+                        return
 
         if not self.related_hosts:
             print '# No results for this range'
@@ -417,14 +395,14 @@ class Network(Host):
     related_hosts -- set of valid Hosts found by scanning each cidr in cidrs
     """
 
-    def __init__(self, cidrs=()):
+    def __init__(self, cidr):
         """
-        cidrs parameter should be an iterable containing a single ipaddress.IPv4Network
-        It is treated as a set of CIDRs to allow reuse of methods from Host
+        cidr parameter should be an ipaddress.IPv4Network
         """
-        self.cidrs = set([cidr for cidr in cidrs if isinstance(cidr, ipa.IPv4Network)])
-        if not self.cidrs:
+        if not cidr:
             raise ValueError
+        # Raises ValueError if cidr is not a valid network
+        self.cidr = ipa.ip_network(cidr.decode('unicode-escape'), strict = False)
         self.related_hosts = set()
 
     def __str__(self):
