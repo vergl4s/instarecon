@@ -8,7 +8,7 @@ import ipaddress as ipa  # https://docs.python.org/3/library/ipaddress.html
 
 from ip import IP
 import log
-import lookups
+import lookup
 
 class Host(object):
     """

@@ -9,7 +9,7 @@ import dns.resolver
 
 from src.ip import IP
 from src.host import Host, Network
-from src import lookups
+from src import lookup
 from src import log
 
 class InstaRecon(object):
