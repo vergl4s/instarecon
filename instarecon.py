@@ -97,8 +97,7 @@ class InstaRecon(object):
             elif type(target) is Network:
                 self.scan_network(target)
 
-    @staticmethod
-    def scan_host(host):
+    def scan_host(self, host):
         """Does all possible scans for host"""
 
         print ''
@@ -181,10 +180,9 @@ class InstaRecon(object):
         if host.cidrs:
             print ''
             print '# Reverse DNS lookup on range {}'.format(', '.join([str(cidr) for cidr in host.cidrs]))
-            host.reverse_lookup_on_related_cidrs(feedback=True)
+            self.reverse_dns_on_cidr(host)
     
-    @staticmethod
-    def scan_host_dns_only(host):
+    def scan_host_dns_only(self, host):
         """Does only direct and reverse DNS lookups for host"""
 
         print ''
@@ -195,13 +193,50 @@ class InstaRecon(object):
             print ''
             print host.print_dns_only()
 
-    @staticmethod
-    def scan_network(network):
-        """Does reverse dns lookups on a network object"""
+    def scan_network(self, network):
+        """Scan a network object"""
         print ''
         print '# _____________ Reverse DNS lookups on {} _____________ #'.format(str(network))
+        self.reverse_dns_on_cidr(network)
 
-        network.reverse_lookup_on_related_cidrs(True)
+    @staticmethod
+    def reverse_dns_on_cidr(target):
+        """Does reverse dns lookups on a target, and saves results to target using target.add_related_host"""
+        cidrs = set()
+        if isinstance(target, Host):
+            [cidrs.add(cidr) for cidr in target.cidrs]
+        elif isinstance(target, Network):
+            cidrs.add(target.cidr)
+
+        for cidr in cidrs:
+            generator = lookup.rev_dns_on_cidr(cidr)
+            while True:
+                try:
+                    ip_or_exception = generator.next()
+                    
+                    if isinstance(ip_or_exception, KeyboardInterrupt):
+                        
+                        if isinstance(target, Host):
+                            if raw_input('[-] Sure you want to stop scanning ' + str(cidr) +
+                                         '? Program flow will continue normally. (y/N):') in ['Y', 'y']:
+                                return                        
+                        elif isinstance(target, Network):
+                            raise KeyboardInterrupt
+
+                    else:
+                        ip = ip_or_exception
+                        reverse_domains = generator.next()
+
+                        new_host = Host(ips=[ip], reverse_domains=reverse_domains)
+                        target.add_related_host(new_host)
+
+                        print new_host.print_all_ips()
+                
+                except StopIteration:
+                    break
+
+        if not target.related_hosts:
+            print '# No results for this range'
 
     def write_output_csv(self, filename=None):
         """Writes output for each target as csv in filename"""

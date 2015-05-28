@@ -176,6 +176,10 @@ class Host(object):
             ip.get_shodan()
         return self
 
+    def add_related_host(self, new_host):
+        self.related_hosts.add(new_host)
+        self._add_to_subdomains_if_valid(subdomains_as_hosts=[new_host])
+
     def google_lookups(self):
         """
         Google queries to find related subdomains and linkedin pages. Testing.
@@ -234,42 +238,6 @@ class Host(object):
                 pass
 
         return False
-
-    def reverse_lookup_on_related_cidrs(self, feedback=False):
-        """
-        Does reverse dns lookups in all cidrs that are related to this host
-        Will be used to check for subdomains found through reverse lookup
-        """
-        for cidr in self.cidrs:
-
-            generator = lookup.rev_dns_on_cidr(cidr)
-
-            while True:
-                try:
-                    # generator may return ip or KeyboardInterrupt
-                    ip_or_exception = generator.next()
-
-                    if isinstance(ip_or_exception, KeyboardInterrupt):
-                        if raw_input('[-] Sure you want to stop scanning ' + str(cidr) +
-                                     '? Program flow will continue normally. (y/N):') in ['Y', 'y']:
-                            return
-                    else:
-                        ip = ip_or_exception
-                        reverse_domains = generator.next()
-                        new_host = Host(ips=[ip], reverse_domains=reverse_domains)
-
-                        self.related_hosts.add(new_host)
-
-                        # Adds new_host to self.subdomains if new_host is subdomain
-                        self._add_to_subdomains_if_valid(subdomains_as_hosts=[new_host])
-
-                        if feedback:
-                            print new_host.print_all_ips()
-                except StopIteration:
-                    break
-
-        if not self.related_hosts and feedback:
-            print '# No results for this range'
 
     def print_all_ips(self):
         if self.ips:

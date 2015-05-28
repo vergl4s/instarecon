@@ -95,7 +95,7 @@ class NetworkTestCase(unittest.TestCase):
         self.assertIsInstance(self.network.related_hosts, set)
 
     def test_reverse_dns_lookup(self):
-        self.network.reverse_lookup_on_related_cidrs()
+        InstaRecon.reverse_dns_on_cidr(self.network)
         self.assertTrue(self.network.related_hosts)
 
 if __name__ == '__main__':
