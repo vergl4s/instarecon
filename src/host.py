@@ -47,7 +47,7 @@ class Host(object):
 
         elif ips:
             self.type = 'ip'
-            
+
             # IP raises ValueError if passed an invalid value
             self.ips = [IP(str(ip), reverse_domains) for ip in ips]
         else:
@@ -91,7 +91,7 @@ class Host(object):
             self._get_ips()
         self.get_rev_domains_for_ips()
         return self
-    
+
     def _get_ips(self):
         """
         Does direct DNS lookup to get IPs from self.domains.
@@ -241,30 +241,34 @@ class Host(object):
         Will be used to check for subdomains found through reverse lookup
         """
         for cidr in self.cidrs:
-            
+
             generator = lookup.rev_dns_on_cidr(cidr)
-            
+
             while True:
                 try:
+                    # generator may return ip or KeyboardInterrupt
+                    ip_or_exception = generator.next()
 
-                    ip, reverse_domains = generator.next()
-                    new_host = Host(ips=[ip], reverse_domains=reverse_domains)
-                    self.related_hosts.add(new_host)
+                    if isinstance(ip_or_exception, KeyboardInterrupt):
+                        if raw_input('[-] Sure you want to stop scanning ' + str(cidr) +
+                                     '? Program flow will continue normally. (y/N):') in ['Y', 'y']:
+                            return
+                    else:
+                        ip = ip_or_exception
+                        reverse_domains = generator.next()
+                        new_host = Host(ips=[ip], reverse_domains=reverse_domains)
 
-                    # Adds new_host to self.subdomains if new_host is subdomain
-                    self._add_to_subdomains_if_valid(subdomains_as_hosts=[new_host])
+                        self.related_hosts.add(new_host)
 
-                    if feedback:
-                        print new_host.print_all_ips()
+                        # Adds new_host to self.subdomains if new_host is subdomain
+                        self._add_to_subdomains_if_valid(subdomains_as_hosts=[new_host])
 
+                        if feedback:
+                            print new_host.print_all_ips()
                 except StopIteration:
                     break
-                except KeyboardInterrupt:
-                    if raw_input('[-] Sure you want to stop scanning ' + str(cidr) +
-                                 '? Program flow will continue normally. (y/N):') in ['Y', 'y']:
-                        return
 
-        if not self.related_hosts:
+        if not self.related_hosts and feedback:
             print '# No results for this range'
 
     def print_all_ips(self):

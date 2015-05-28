@@ -91,26 +91,18 @@ class InstaRecon(object):
         for target in self.targets:
             if type(target) is Host:
                 if self.dns_only:
-                    self.dns_scan_on_host(target)
+                    self.scan_host_dns_only(target)
                 else:
-                    self.full_scan_on_host(target)
+                    self.scan_host(target)
             elif type(target) is Network:
-                self.reverse_dns_on_network(target)
+                self.scan_network(target)
 
     @staticmethod
-    def reverse_dns_on_network(network):
-        """Does reverse dns lookups on a network object"""
-        print ''
-        print '# _____________ Reverse DNS lookups on {} _____________ #'.format(str(network))
-
-        network.reverse_lookup_on_related_cidrs(True)
-
-    @staticmethod
-    def full_scan_on_host(host):
+    def scan_host(host):
         """Does all possible scans for host"""
-        
+
         print ''
-        print '# ____________________ Scanning {} {} ____________________ #'.format(host.type,str(host))
+        print '# ____________________ Scanning {} ____________________ #'.format(str(host))
 
         # DNS and Whois lookups
         print ''
@@ -156,7 +148,7 @@ class InstaRecon(object):
                 print ''
                 print '[*] Whois IP for '+str(ip)+':'
                 print m
-                
+
         # Shodan lookup
         if lookup.shodan_key:
 
@@ -190,9 +182,9 @@ class InstaRecon(object):
             print ''
             print '# Reverse DNS lookup on range {}'.format(', '.join([str(cidr) for cidr in host.cidrs]))
             host.reverse_lookup_on_related_cidrs(feedback=True)
-
+    
     @staticmethod
-    def dns_scan_on_host(host):
+    def scan_host_dns_only(host):
         """Does only direct and reverse DNS lookups for host"""
 
         print ''
@@ -202,6 +194,14 @@ class InstaRecon(object):
         if host.domain:
             print ''
             print host.print_dns_only()
+
+    @staticmethod
+    def scan_network(network):
+        """Does reverse dns lookups on a network object"""
+        print ''
+        print '# _____________ Reverse DNS lookups on {} _____________ #'.format(str(network))
+
+        network.reverse_lookup_on_related_cidrs(True)
 
     def write_output_csv(self, filename=None):
         """Writes output for each target as csv in filename"""

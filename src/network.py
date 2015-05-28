@@ -39,22 +39,31 @@ class Network(object):
         Will be used to check for subdomains found through reverse lookup
         """
         generator = lookup.rev_dns_on_cidr(self.cidr)
-        
+
         while True:
             try:
 
-                ip, reverse_domains = generator.next()
-                new_host = Host(ips=[ip], reverse_domains=reverse_domains)
+                # generator may return ip or KeyboardInterrupt
+                ip_or_exception = generator.next()
+                
+                if isinstance(ip_or_exception, KeyboardInterrupt):
+                    raise KeyboardInterrupt
+                
+                else:
+                    ip = ip_or_exception
+                    reverse_domains = generator.next()
 
-                self.related_hosts.add(new_host)
+                    new_host = Host(ips=[ip], reverse_domains=reverse_domains)
 
-                if feedback:
-                    print new_host.print_all_ips()
+                    self.related_hosts.add(new_host)
+
+                    if feedback:
+                        print new_host.print_all_ips()
 
             except StopIteration:
                 break
 
-        if not self.related_hosts:
+        if not self.related_hosts and feedback:
             print '# No results for this range'
 
     def print_as_csv_lines(self):

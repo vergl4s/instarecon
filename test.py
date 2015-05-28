@@ -1,15 +1,20 @@
 #!/usr/bin/env python
-import unittest
-import random
 import itertools
+import os
+import random
+import unittest
+
+import ipaddress
 
 from instarecon import *
-import ipaddress
+import src.lookup
 
 class HostTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        lookup.shodan_key = os.getenv('SHODAN_KEY')
+
         possible_hosts = [
             'google.com',
             'amazon.com',
@@ -18,6 +23,7 @@ class HostTestCase(unittest.TestCase):
             'google.cn',
             'sucuri.net',
         ]
+
         cls.host = Host(random.choice(possible_hosts))
         print '\n# Testing {} {}'.format(cls.host.type, str(cls.host))
         cls.host.dns_lookups()
@@ -31,7 +37,7 @@ class HostTestCase(unittest.TestCase):
         self.assertIsInstance(self.host.whois_domain, unicode)
         self.assertIsInstance(self.host.cidrs,set)
         [self.assertIsInstance(cidr, ipaddress.IPv4Network) for cidr in self.host.cidrs]
-            
+
     def test_whois_domain(self):
         self.assertTrue(self.host.whois_domain)
 
@@ -53,7 +59,7 @@ class IPTestCase(unittest.TestCase):
         cls.ip.get_rev_domains()
         cls.ip.get_whois_ip()
         print '\n# Testing IP {}'.format(str(cls.ip))
-    
+
     def test_property_types(self):
         self.assertIsInstance(self.ip.ip, str)
         self.assertIsInstance(self.ip.rev_domains, list)
@@ -65,7 +71,7 @@ class IPTestCase(unittest.TestCase):
         """
         Test function that removes overlapping cidrs
         Used in case whois_ip results
-        contain cidrs 
+        contain cidrs
         """
         cidrs = [
             ipa.ip_network(u'54.192.0.0/12'),

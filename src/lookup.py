@@ -18,32 +18,38 @@ dns_resolver = dns.resolver.Resolver()
 dns_resolver.timeout = 5
 dns_resolver.lifetime = 5
 shodan_key = None
+dns_exceptions = (
+    dns.resolver.NXDOMAIN,
+    dns.resolver.NoAnswer,
+    dns.exception.Timeout,
+    dns.exception.SyntaxError
+)
 
 def direct_dns(name):
     try:
         return dns_resolver.query(name)
-    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.exception.Timeout, dns.exception.SyntaxError) as e:
-        log.raise_error('[-] Host lookup failed for ' + name, sys._getframe().f_code.co_name)
+    except dns_exceptions as e:
+        log.raise_error('Host lookup failed for ' + name, sys._getframe().f_code.co_name)
 
 def reverse_dns(ip):
     try:
         return dns_resolver.query(dns.reversename.from_address(ip), 'PTR')
-    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.exception.Timeout) as e:
-        log.raise_error('[-] Host lookup failed for ' + ip, sys._getframe().f_code.co_name)
+    except (dns_exceptions) as e:
+        log.raise_error('Host lookup failed for ' + ip, sys._getframe().f_code.co_name)
 
 def mx_dns(name):
     try:
         # rdata.exchange for domains and rdata.preference for integer
         return [str(mx.exchange).rstrip('.') for mx in dns_resolver.query(name, 'MX')]
-    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.exception.Timeout) as e:
-        log.raise_error('[-] MX lookup failed for ' + name, sys._getframe().f_code.co_name)
+    except (dns_exceptions) as e:
+        log.raise_error('MX lookup failed for ' + name, sys._getframe().f_code.co_name)
 
 def ns_dns(name):
     try:
         # rdata.exchange for domains and rdata.preference for integer
         return [str(ns).rstrip('.') for ns in dns_resolver.query(name, 'NS')]
-    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.exception.Timeout) as e:
-        log.raise_error('[-] NS lookup failed for ' + name, sys._getframe().f_code.co_name)
+    except (dns_exceptions) as e:
+        log.raise_error('NS lookup failed for ' + name, sys._getframe().f_code.co_name)
 
 def whois_domain(name):
     try:
@@ -51,7 +57,7 @@ def whois_domain(name):
         if 'raw' in query:
             return query['raw'][0].split('<<<')[0].lstrip().rstrip()
     except Exception as e:
-        log.raise_error('[-] NS lookup failed for ' + name, sys._getframe().f_code.co_name)
+        log.raise_error('NS lookup failed for ' + name, sys._getframe().f_code.co_name)
 
 def whois_ip(ip):
     try:
@@ -68,33 +74,30 @@ def shodan(ip):
 
 def rev_dns_on_cidr(cidr):
     """
-    Reverse DNS lookups on each IP within a CIDR. 
-    cidr needs to be ipa.IPv4Networks.
-    Yields tuple(ip, reverse_domains)
+    Reverse DNS lookups on each IP within a CIDR. cidrneeds to be ipa.IPv4Networks.
+    Yields valid ip, and then reverse_domains. Yields KeyboardInterrupt in case of KeyboardInterrupt.
     """
     if not isinstance(cidr, ipa.IPv4Network):
        raise ValueError
     else:
         for ip in cidr:
-            # Holds lookup results
             lookup_result = None
+
             # Used to repeat same scan if user issues KeyboardInterrupt
-            this_scan_completed = False
-
-            while not this_scan_completed:
+            scan_completed = False
+            while not scan_completed:
                 try:
-                    lookup_result = reverse_dns(str(ip))
-                    this_scan_completed = True
-                except (dns.resolver.NXDOMAIN,
-                        dns.resolver.NoAnswer,
-                        dns.resolver.NoNameservers,
-                        dns.exception.Timeout) as e:
-                    this_scan_completed = True
 
-                if lookup_result:
-                    # Organizing reverse lookup results
-                    reverse_domains = [str(domain).rstrip('.') for domain in lookup_result]
-                    yield ip, reverse_domains
+                    lookup_result = reverse_dns(str(ip))
+                    if lookup_result:
+                        reverse_domains = [str(domain).rstrip('.') for domain in lookup_result]
+                        yield ip
+                        yield reverse_domains
+
+                    scan_completed = True
+
+                except KeyboardInterrupt as e:
+                    yield e
 
 def google_linkedin_page(name):
     """
