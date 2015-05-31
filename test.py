@@ -7,13 +7,13 @@ import unittest
 import ipaddress
 
 from instarecon import *
-import src.lookup
+from src import lookup
 
 class HostTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        lookup.shodan_key = os.getenv('SHODAN_KEY')
+        
 
         possible_hosts = [
             'google.com',
@@ -29,14 +29,22 @@ class HostTestCase(unittest.TestCase):
         cls.host.dns_lookups()
         cls.host.get_whois_domain()
         cls.host.get_whois_ip()
+        cls.host.get_all_shodan()
 
     def test_property_types(self):
+        self.assertEquals(self.host.type, 'domain')
         self.assertIsInstance(self.host.domain, str)
-        [ self.assertIsInstance(ip, IP) for ip in self.host.ips ]
+        [self.assertIsInstance(ip, IP) for ip in self.host.ips]
         self.assertIsInstance(self.host.ips, list)
         self.assertIsInstance(self.host.whois_domain, unicode)
         self.assertIsInstance(self.host.cidrs,set)
         [self.assertIsInstance(cidr, ipaddress.IPv4Network) for cidr in self.host.cidrs]
+
+    def test_valid_results(self):
+        self.assertTrue(self.host.domain)
+        self.assertTrue(self.host.ips)
+        self.assertTrue(self.host.whois_domain)
+        self.assertTrue(self.host.cidrs)
 
     def test_whois_domain(self):
         self.assertTrue(self.host.whois_domain)
@@ -55,17 +63,27 @@ class IPTestCase(unittest.TestCase):
             '4.2.2.2',
             '139.130.4.5',
         ]
-        cls.ip = IP(random.choice(possible_ips))
-        cls.ip.get_rev_domains()
-        cls.ip.get_whois_ip()
-        print '\n# Testing IP {}'.format(str(cls.ip))
+        cls.host = Host(ips=[(random.choice(possible_ips))])
+        cls.host.ips[0].get_rev_domains()
+        cls.host.ips[0].get_whois_ip()
+        cls.host.ips[0].get_shodan()
+        print '\n# Testing {} {}'.format(cls.host.type,str(cls.host))
 
     def test_property_types(self):
-        self.assertIsInstance(self.ip.ip, str)
-        self.assertIsInstance(self.ip.rev_domains, list)
-        self.assertIsInstance(self.ip.whois_ip, dict)
-        self.assertIsInstance(self.ip.cidrs, set)
-        [self.assertIsInstance(cidr, ipaddress.IPv4Network) for cidr in self.ip.cidrs]
+        self.assertEquals(self.host.type, 'ip')
+        self.assertIsInstance(self.host.ips[0].ip, str)
+        self.assertIsInstance(self.host.ips[0].rev_domains, list)
+        self.assertIsInstance(self.host.ips[0].whois_ip, dict)
+        self.assertIsInstance(self.host.ips[0].cidrs, set)
+        [self.assertIsInstance(cidr, ipaddress.IPv4Network) for cidr in self.host.ips[0].cidrs]
+        self.assertIsInstance(self.host.ips[0].shodan.get('ip_str'), unicode)
+
+    def test_valid_results(self):
+        self.assertTrue(self.host.ips[0].ip)
+        self.assertTrue(self.host.ips[0].rev_domains)
+        self.assertTrue(self.host.ips[0].whois_ip)
+        self.assertTrue(self.host.ips[0].cidrs)
+        self.assertTrue(self.host.ips[0].shodan)
 
     def test_ip_remove_overlapping_cidr_function(self):
         """
@@ -99,4 +117,5 @@ class NetworkTestCase(unittest.TestCase):
         self.assertTrue(self.network.related_hosts)
 
 if __name__ == '__main__':
+    lookup.shodan_key = os.getenv('SHODAN_KEY')
     unittest.main()

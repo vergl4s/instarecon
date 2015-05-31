@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import ipaddress as ipa  # https://docs.python.org/3/library/ipaddress.html
 
-from host import Host
 import lookup
 
 class Network(object):
@@ -20,7 +19,7 @@ class Network(object):
         if not cidr:
             raise ValueError
         # Raises ValueError if cidr is not a valid network
-        self.cidr = ipa.ip_network(cidr.decode('unicode-escape'), strict = False)
+        self.cidr = ipa.ip_network(unicode(cidr), strict=False)
         self.related_hosts = set()
         self.type = 'network'
 

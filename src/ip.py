@@ -15,17 +15,17 @@ class IP(object):
 
     Keyword arguments:
     ip -- Str representation of this ip e.g. '8.8.8.8'
-    whois_ip -- Dict containing results for Whois lookups against self.ip
-    cidr -- set of ipa.IPv4Network that contains self.ip (taken from whois_ip), e.g. 8.8.8.0/24
+    whois_ip -- Dict containing results from IP Whois lookups
+    cidrs -- set of ipa.IPv4Network representing networks that contain self.ip (taken from whois_ip)
     rev_domains -- List of str for each reverse domain for self.ip, found through reverse DNS lookups
     shodan -- Dict containing Shodan results
     """
 
     def __init__(self, ip, rev_domains=()):
-        
+
         #Will raise an exception in case ip is not a valid address
-        ipa.ip_address(ip.decode('unicode-escape'))
-        
+        ipa.ip_address(unicode(ip))
+
         self.ip = str(ip)
         self.rev_domains = rev_domains
         self.whois_ip = {}
@@ -60,7 +60,7 @@ class IP(object):
                     cidrs = []
 
                     for net in self.whois_ip['nets']:
-                        net_cidrs = [ipa.ip_network(cidr.rstrip().lstrip().decode('unicode-escape')) for cidr in net['cidr'].split(',') if cidr]
+                        net_cidrs = [ipa.ip_network(unicode(cidr.rstrip().lstrip())) for cidr in net['cidr'].split(',') if cidr]
                         cidrs += net_cidrs
 
                     self.cidrs = self._remove_overlaping_cidrs(cidrs)

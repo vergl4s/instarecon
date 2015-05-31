@@ -25,7 +25,7 @@ class Host(object):
     subdomains -- Set of Hosts for each related Host found that is a subdomain of self.domain
     linkedin_page -- Str of LinkedIn url that contains domain in html
     related_hosts -- Set of Hosts that may be related to host, as they're part of the same cidrs
-    cidrs -- set of ipa.IPv4Networks for each ip.cidrs
+    cidrs -- set of ipa.IPv4Network objects related to each ip.cidrs
     urls -- set of urls found in google results
     """
 
@@ -153,7 +153,7 @@ class Host(object):
         for ip in self.ips:
             cidr_found = False
             for cidr, whois_ip in cidrs_found.iteritems():
-                if ipa.ip_address(ip.ip.decode('unicode-escape')) in cidr:  # cidr already IPv4.Network obj
+                if ipa.ip_address(unicode(ip.ip)) in cidr:  # cidr already IPv4.Network obj
                     # If cidr is already in Host, we won't call get_whois_ip again.
                     # Note cidr already found is not saved in new ips, as it isn't really necessary
                     ip.whois_ip = whois_ip
@@ -164,7 +164,7 @@ class Host(object):
                 for cidr in ip.cidrs:
                     cidrs_found[cidr] = ip.whois_ip
 
-        self.cidrs = set([cidr for cidr in cidrs_found if cidr])
+        self.cidrs = set([cidr for cidr in cidrs_found])
         return self
 
     def get_all_shodan(self):

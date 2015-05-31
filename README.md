@@ -386,3 +386,12 @@ weheart.github.com
 # Saving output csv file
 # Done
 ```
+
+###TODO
+* Shodan robots.txt
+* Improve output files - CSV needs to look better. Possibly add XML or HTML? Also possibly use a logger for this.
+* Make a proper GitHub release for v0.1 (https://github.com/blog/1547-release-your-software)
+* Improve Google crawler performance, implement random headers and user-agents.
+* Scan threading.
+* LinkedIn page scraping. Possibly other sources?
+* Pip installable? (https://packaging.python.org/en/latest/distributing.html).

@@ -15,62 +15,84 @@ import shodan  as shodan_api# https://shodan.readthedocs.org/en/latest/index.htm
 import log
 
 dns_resolver = dns.resolver.Resolver()
-dns_resolver.timeout = 5
-dns_resolver.lifetime = 5
+dns_resolver.timeout = 2
+dns_resolver.lifetime = 2
+dns_maximum_retries = 3
+
 shodan_key = None
+
 dns_exceptions = (
-    dns.resolver.NXDOMAIN,
     dns.resolver.NoAnswer,
-    dns.exception.Timeout,
-    dns.exception.SyntaxError
+    dns.resolver.NXDOMAIN,
+    dns.resolver.YXDOMAIN,
+    dns.exception.SyntaxError,
 )
 
+dns_timeout = (dns.exception.Timeout)
+
 def direct_dns(name):
-    try:
-        return dns_resolver.query(name)
-    except dns_exceptions as e:
-        log.raise_error('Host lookup failed for ' + name, sys._getframe().f_code.co_name)
+    return dns_lookup_manager(name,'A')
 
 def reverse_dns(ip):
-    try:
-        return dns_resolver.query(dns.reversename.from_address(ip), 'PTR')
-    except (dns_exceptions) as e:
-        log.raise_error('Host lookup failed for ' + ip, sys._getframe().f_code.co_name)
+    return dns_lookup_manager(ip,'PTR')
 
 def mx_dns(name):
-    try:
-        # rdata.exchange for domains and rdata.preference for integer
-        return [str(mx.exchange).rstrip('.') for mx in dns_resolver.query(name, 'MX')]
-    except (dns_exceptions) as e:
-        log.raise_error('MX lookup failed for ' + name, sys._getframe().f_code.co_name)
+    return [str(mx.exchange).rstrip('.') for mx in dns_lookup_manager(name,'MX')]
 
 def ns_dns(name):
-    try:
-        # rdata.exchange for domains and rdata.preference for integer
-        return [str(ns).rstrip('.') for ns in dns_resolver.query(name, 'NS')]
-    except (dns_exceptions) as e:
-        log.raise_error('NS lookup failed for ' + name, sys._getframe().f_code.co_name)
+    return [str(ns).rstrip('.') for ns in dns_lookup_manager(name,'NS')]
+
+def dns_lookup_manager(target, lookup_type):
+    tries=0
+    while tries < dns_maximum_retries:
+        try:
+
+            if lookup_type == 'A':
+                return dns_resolver.query(target)
+            
+            elif lookup_type == 'PTR':
+                return dns_resolver.query(dns.reversename.from_address(target), 'PTR')
+            
+            elif lookup_type == 'MX':
+                return  dns_resolver.query(target, 'MX')
+            
+            elif lookup_type == 'NS':
+                return dns_resolver.query(target, 'NS')
+
+        except dns_exceptions as e:
+            log.error(lookup_type + ' DNS lookup failed for ' + target, sys._getframe().f_code.co_name)
+            break
+
+        except dns_timeout:
+            tries += 1
+            if tries < dns_maximum_retries:
+                log.error('Timeout resolving ' + target + '. Retrying.', sys._getframe().f_code.co_name)
+            else:
+                log.error(str(dns_maximum_retries)+ ' timeouts resolving ' + target + '. Giving up.', sys._getframe().f_code.co_name)    
+                raise log.NoInternetAccess
 
 def whois_domain(name):
     try:
         query = whois.get_whois(name)
         if 'raw' in query:
             return query['raw'][0].split('<<<')[0].lstrip().rstrip()
-    except Exception as e:
-        log.raise_error('NS lookup failed for ' + name, sys._getframe().f_code.co_name)
+    except socket.gaierror:
+        log.error('Whois lookup failed for ' + name, sys._getframe().f_code.co_name)
+    # except Exception as e:
+    #     log.error('Whois lookup failed for ' + name, sys._getframe().f_code.co_name)
 
 def whois_ip(ip):
     try:
          return ipw(ip).lookup() or None
     except Exception as e:
-        log.raise_error(e, sys._getframe().f_code.co_name)
+        log.error(e, sys._getframe().f_code.co_name)
 
 def shodan(ip):
     try:
         api = shodan_api.Shodan(shodan_key)
         return api.host(str(ip))
     except Exception as e:
-        log.raise_error(e, sys._getframe().f_code.co_name)    
+        log.error(e, sys._getframe().f_code.co_name)    
 
 def rev_dns_on_cidr(cidr):
     """
@@ -113,7 +135,7 @@ def google_linkedin_page(name):
             if 'linkedin.com/company/' in url:
                 return re.sub('<.*?>', '', url)
     except Exception as e:
-        log.raise_error(e, sys._getframe().f_code.co_name)
+        log.error(e, sys._getframe().f_code.co_name)
 
 def google_subdomains(name):
     """
@@ -143,7 +165,7 @@ def google_subdomains(name):
         try:
             google_search = requests.get(request)
         except Exception as e:
-            Error.log(e, sys._getframe().f_code.co_name)
+            log.error(e, sys._getframe().f_code.co_name)
 
         new_subdomains = set()
         if google_search:
