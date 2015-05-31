@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 from random import randint
 import re
+import socket
 import sys
 import time
 
 import dns.resolver
 import dns.reversename
 import ipaddress as ipa  # https://docs.python.org/3/library/ipaddress.html
-from ipwhois import IPWhois as ipw  # https://pypi.python.org/pypi/ipwhois
+import ipwhois as ipw  # https://pypi.python.org/pypi/ipwhois
 import pythonwhois as whois  # http://cryto.net/pythonwhois/usage.html https://github.com/joepie91/python-whois
 import requests
 import shodan  as shodan_api# https://shodan.readthedocs.org/en/latest/index.html
@@ -18,17 +19,15 @@ dns_resolver = dns.resolver.Resolver()
 dns_resolver.timeout = 2
 dns_resolver.lifetime = 2
 dns_maximum_retries = 3
-
-shodan_key = None
-
 dns_exceptions = (
     dns.resolver.NoAnswer,
     dns.resolver.NXDOMAIN,
     dns.resolver.YXDOMAIN,
     dns.exception.SyntaxError,
 )
-
 dns_timeout = (dns.exception.Timeout)
+
+shodan_key = None
 
 def direct_dns(name):
     return dns_lookup_manager(name,'A')
@@ -76,23 +75,24 @@ def whois_domain(name):
         query = whois.get_whois(name)
         if 'raw' in query:
             return query['raw'][0].split('<<<')[0].lstrip().rstrip()
-    except socket.gaierror:
+    except socket.gaierror as e:
         log.error('Whois lookup failed for ' + name, sys._getframe().f_code.co_name)
-    # except Exception as e:
-    #     log.error('Whois lookup failed for ' + name, sys._getframe().f_code.co_name)
+        raise log.NoInternetAccess
 
 def whois_ip(ip):
     try:
-         return ipw(ip).lookup() or None
-    except Exception as e:
+         return ipw.IPWhois(ip).lookup() or None
+    except ipw.WhoisLookupError:
         log.error(e, sys._getframe().f_code.co_name)
+        raise log.NoInternetAccess
 
 def shodan(ip):
     try:
         api = shodan_api.Shodan(shodan_key)
         return api.host(str(ip))
-    except Exception as e:
-        log.error(e, sys._getframe().f_code.co_name)    
+    except (socket.gaierror, shodan_api.client.APIError) as e:
+        log.error(e, sys._getframe().f_code.co_name)
+        raise log.NoInternetAccess
 
 def rev_dns_on_cidr(cidr):
     """
@@ -136,6 +136,7 @@ def google_linkedin_page(name):
                 return re.sub('<.*?>', '', url)
     except Exception as e:
         log.error(e, sys._getframe().f_code.co_name)
+        raise log.NoInternetAccess
 
 def google_subdomains(name):
     """
@@ -164,7 +165,7 @@ def google_subdomains(name):
         google_search = None
         try:
             google_search = requests.get(request)
-        except Exception as e:
+        except requests.ConnectionError as e:
             log.error(e, sys._getframe().f_code.co_name)
 
         new_subdomains = set()
