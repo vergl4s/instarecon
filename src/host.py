@@ -80,7 +80,7 @@ class Host(object):
         elif self.type == 'ip':
             return self.ips == other.ips
 
-    def dns_lookups(self):
+    def lookup_dns(self):
         """
         Basic DNS lookups on self. Returns self.
 
@@ -89,51 +89,51 @@ class Host(object):
         """
         if self.type == 'domain':
             self._get_ips()
-        self.get_rev_domains_for_ips()
+        self.lookup_dns_rev_all()
         return self
 
     def _get_ips(self):
         """
         Does direct DNS lookup to get IPs from self.domains.
-        Used internally by self.dns_lookups()
+        Used internally by self.lookup_dns()
         """
         if self.domain and not self.ips:
             ips = lookup.direct_dns(self.domain)
             if ips:
                 self.ips = [IP(str(ip)) for ip in ips]
 
-    def mx_dns_lookup(self):
+    def lookup_dns_mx(self):
         """
         DNS lookup to find MX entries i.e. mail servers responsible for self.domain
         """
         if self.domain:
             mx_list = lookup.mx_dns(self.domain)
             if mx_list:
-                self.mx.update([Host(domain=mx).dns_lookups() for mx in mx_list])
+                self.mx.update([Host(domain=mx).lookup_dns() for mx in mx_list])
                 self._add_to_subdomains_if_valid(subdomains_as_hosts=self.mx)
         return self
 
-    def ns_dns_lookup(self):
+    def lookup_dns_ns(self):
         """
         DNS lookup to find NS entries i.e. name/DNS servers responsible for self.domain
         """
         if self.domain:
             ns_list = lookup.ns_dns(self.domain)
             if ns_list:
-                self.ns.update([Host(domain=ns).dns_lookups() for ns in ns_list])
+                self.ns.update([Host(domain=ns).lookup_dns() for ns in ns_list])
                 self._add_to_subdomains_if_valid(subdomains_as_hosts=self.ns)
         return self
 
-    def get_rev_domains_for_ips(self):
+    def lookup_dns_rev_all(self):
         """
         Reverse DNS lookup on each IP in self.ips
         """
         if self.ips:
             for ip in self.ips:
-                ip.get_rev_domains()
+                ip.lookup_rev_dns()
         return self
 
-    def get_whois_domain(self):
+    def lookup_whois_domain(self):
         """
         Whois lookup on self.domain. Saved in self.whois_domain as string,
         since each top-level domain has a way of representing data.
@@ -143,7 +143,7 @@ class Host(object):
             self.whois_domain = lookup.whois_domain(self.domain)
         return self
 
-    def get_whois_ip(self):
+    def lookup_whois_ip_all(self):
         """
         IP Whois lookups on each ip within self.ips
         Saved in each ip.whois_ip as dict, since this is how it is returned by ipwhois library.
@@ -154,26 +154,26 @@ class Host(object):
             cidr_found = False
             for cidr, whois_ip in cidrs_found.iteritems():
                 if ipa.ip_address(unicode(ip.ip)) in cidr:  # cidr already IPv4.Network obj
-                    # If cidr is already in Host, we won't call get_whois_ip again.
+                    # If cidr is already in Host, we won't call whois_ip again.
                     # Note cidr already found is not saved in new ips, as it isn't really necessary
                     ip.whois_ip = whois_ip
                     cidr_found = True
                     break
             if not cidr_found:
-                ip.get_whois_ip()
+                ip.lookup_whois_ip()
                 for cidr in ip.cidrs:
                     cidrs_found[cidr] = ip.whois_ip
 
         self.cidrs = set([cidr for cidr in cidrs_found])
         return self
 
-    def get_all_shodan(self):
+    def lookup_shodan_all(self):
         """
         Shodan lookups for each ip within self.ips.
         Saved in ip.shodan as dict.
         """
         for ip in self.ips:
-            ip.get_shodan()
+            ip.lookup_shodan()
         return self
 
     def add_related_host(self, new_host):
@@ -198,7 +198,7 @@ class Host(object):
     def google_subdomains(self):
         """Find as many subdomains from google as possible"""
 
-        self._add_to_subdomains_if_valid([Host(domain=subdomain).dns_lookups() for subdomain in lookup.google_subdomains(self.domain)])
+        self._add_to_subdomains_if_valid([Host(domain=subdomain).lookup_dns() for subdomain in lookup.google_subdomains(self.domain)])
 
     def _add_to_subdomains_if_valid(self, subdomains_as_hosts=None):
         """
@@ -351,12 +351,12 @@ class Host(object):
         This method does all possible direct lookups for a Host.
         Not called by any Host or Scan function, only here for testing purposes.
         """
-        self.dns_lookups()
-        self.ns_dns_lookup()
-        self.mx_dns_lookup()
-        self.get_whois_domain()
-        self.get_whois_ip()
+        self.lookup_dns()
+        self.lookup_dns_ns()
+        self.lookup_dns_mx()
+        self.lookup_whois_domain()
+        self.lookup_whois_ip_all()
         if shodan_key:
-            self.get_all_shodan(shodan_key)
+            self.lookup_shodan_all(shodan_key)
         self.google_lookups()
 

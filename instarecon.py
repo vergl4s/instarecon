@@ -134,13 +134,13 @@ class InstaRecon(object):
         print ''
         print '# Whois lookups'
 
-        host.get_whois_domain()
+        host.whois_domain_lookup()
         if host.whois_domain:
             print ''
             print '[*] Whois domain:'
             print host.whois_domain
 
-        host.get_whois_ip()
+        host.whois_ip_all_ips()
         for ip in host.ips:
             m = ip.print_whois_ip()
             if m:
@@ -154,7 +154,7 @@ class InstaRecon(object):
             print ''
             print '# Querying Shodan for open ports'
 
-            host.get_all_shodan()
+            host.shodan_all_ips()
 
             m = host.print_all_shodan()
             if m:
@@ -176,7 +176,7 @@ class InstaRecon(object):
             else:
                 print '[-] Error: No subdomains found in Google. If you are scanning a lot, Google might be blocking your requests.'
 
-        # DNS lookups on entire CIDRs taken from host.get_whois_ip()
+        # DNS lookups on entire CIDRs taken from host.whois_ip_all_ips()
         if host.cidrs:
             print ''
             print '# Reverse DNS lookup on range {}'.format(', '.join([str(cidr) for cidr in host.cidrs]))

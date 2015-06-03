@@ -26,10 +26,10 @@ class HostTestCase(unittest.TestCase):
 
         cls.host = Host(random.choice(possible_hosts))
         print '\n# Testing {} {}'.format(cls.host.type, str(cls.host))
-        cls.host.dns_lookups()
-        cls.host.get_whois_domain()
-        cls.host.get_whois_ip()
-        cls.host.get_all_shodan()
+        cls.host.lookup_dns()
+        cls.host.lookup_whois_domain()
+        cls.host.lookup_whois_ip_all()
+        cls.host.lookup_shodan_all()
 
     def test_property_types(self):
         self.assertEquals(self.host.type, 'domain')
@@ -64,9 +64,9 @@ class IPTestCase(unittest.TestCase):
             '139.130.4.5',
         ]
         cls.host = Host(ips=[(random.choice(possible_ips))])
-        cls.host.ips[0].get_rev_domains()
-        cls.host.ips[0].get_whois_ip()
-        cls.host.ips[0].get_shodan()
+        cls.host.ips[0].lookup_rev_dns()
+        cls.host.ips[0].lookup_whois_ip()
+        cls.host.ips[0].lookup_shodan()
         print '\n# Testing {} {}'.format(cls.host.type,str(cls.host))
 
     def test_property_types(self):

@@ -70,7 +70,7 @@ def dns_lookup_manager(target, lookup_type):
             log.error(lookup_type + ' DNS lookup failed for ' + target, sys._getframe().f_code.co_name)
             break
 
-        except dns_timeout:
+        except dns_timeout as e:
             tries += 1
             if tries < dns_maximum_retries:
                 log.error('Timeout resolving ' + target + '. Retrying.', sys._getframe().f_code.co_name)
@@ -89,7 +89,7 @@ def whois_domain(name):
 def whois_ip(ip):
     try:
          return ipw.IPWhois(ip).lookup() or None
-    except ipw.WhoisLookupError:
+    except ipw.WhoisLookupError as e:
         log.error(e, sys._getframe().f_code.co_name)
 
 def shodan(ip):

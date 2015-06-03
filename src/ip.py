@@ -41,17 +41,17 @@ class IP(object):
     def __eq__(self, other):
         return self.ip == other.ip
 
-    def get_rev_domains(self):
+    def lookup_rev_dns(self):
         rev_domains = None
         rev_domains = lookup.reverse_dns(self.ip)
         if rev_domains:
             self.rev_domains = [str(domain).rstrip('.') for domain in rev_domains]
         return self
 
-    def get_shodan(self):
+    def lookup_shodan(self):
         self.shodan = lookup.shodan(str(self))
 
-    def get_whois_ip(self):
+    def lookup_whois_ip(self):
         self.whois_ip = lookup.whois_ip(str(self))
 
         if self.whois_ip:
