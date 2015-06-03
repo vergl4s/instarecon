@@ -1,4 +1,12 @@
 #!/usr/bin/env python
+
+"""
+Module wraps all lookups done by InstaRecon and returns only results.
+
+Raises log.NoInternetAccess.
+
+"""
+
 from random import randint
 import re
 import socket
@@ -77,14 +85,12 @@ def whois_domain(name):
             return query['raw'][0].split('<<<')[0].lstrip().rstrip()
     except socket.gaierror as e:
         log.error('Whois lookup failed for ' + name, sys._getframe().f_code.co_name)
-        raise log.NoInternetAccess
 
 def whois_ip(ip):
     try:
          return ipw.IPWhois(ip).lookup() or None
     except ipw.WhoisLookupError:
         log.error(e, sys._getframe().f_code.co_name)
-        raise log.NoInternetAccess
 
 def shodan(ip):
     try:
@@ -92,7 +98,6 @@ def shodan(ip):
         return api.host(str(ip))
     except (socket.gaierror, shodan_api.client.APIError) as e:
         log.error(e, sys._getframe().f_code.co_name)
-        raise log.NoInternetAccess
 
 def rev_dns_on_cidr(cidr):
     """
@@ -127,94 +132,126 @@ def google_linkedin_page(name):
 
     Google query is "site:linkedin.com/company name", and first result is used
     """
+    request = 'http://google.com/search?hl=en&meta=&num=10&q=site:linkedin.com/company%20"' + name + '"'
+    
     try:
-        request = 'http://google.com/search?hl=en&meta=&num=10&q=site:linkedin.com/company%20"' + name + '"'
         google_search = requests.get(request)
-        google_results = re.findall('<cite>(.+?)<\/cite>', google_search.text)
-        for url in google_results:
-            if 'linkedin.com/company/' in url:
-                return re.sub('<.*?>', '', url)
     except Exception as e:
         log.error(e, sys._getframe().f_code.co_name)
         raise log.NoInternetAccess
+    
+    google_results = re.findall('<cite>(.+?)<\/cite>', google_search.text)
+    for url in google_results:
+        if 'linkedin.com/company/' in url:
+            return re.sub('<.*?>', '', url)
 
 def google_subdomains(name):
     """
     This method uses google dorks to get as many subdomains from google as possible
-    It returns a set of Hosts for each subdomain found in google
-    Each Host will have dns_lookups() already callled, with possibly ips and rev_domains filled
+    Returns a dictionary with key=str(subdomain), value=GoogleDomainResult object
     """
-    def _google_subdomain_lookup(domain, subdomains_to_avoid, num, counter):
-        """
-        Sub method that reaches out to google using the following query:
-        site:*.domain -site:subdomain_to_avoid1 -site:subdomain_to_avoid2 -site:subdomain_to_avoid3...
 
-        Returns list of unique subdomain strings
-        """
-        request = 'http://google.com/search?hl=en&meta=&num=' + str(num) + '&start=' + str(counter) + '&q=' +\
-            'site%3A%2A' + domain
+    google_results = {}
+    results_in_last_iteration = -1
 
-        for subdomain in subdomains_to_avoid[:8]:
-            # Don't want to remove original name from google query
-            if subdomain != domain:
-                request = ''.join([request, '%20%2Dsite%3A', str(subdomain)])
+    while len(google_results) > results_in_last_iteration:
 
-        # Sleep some time between 0 - 4.999 seconds
         time.sleep(randint(0, 4) + randint(0, 1000) * 0.001)
-        
-        google_search = None
-        try:
-            google_search = requests.get(request)
-        except requests.ConnectionError as e:
-            log.error(e, sys._getframe().f_code.co_name)
 
-        new_subdomains = set()
-        if google_search:
-            google_results = re.findall('<cite>(.+?)<\/cite>', google_search.text)
+        # Make this funct keep iterating until there are new results
+        results_in_last_iteration = len(google_results)
 
-            for url in set(google_results):
-                # Removing html tags from inside url (sometimes they ise <b> or <i> for ads)
-                url = re.sub('<.*?>', '', url)
+        #Order google_results by .count, as we want only the top 8 subs with more results
+        list_of_sub_ordered_by_count = sorted(google_results, key = lambda sub: google_results[sub].count, reverse=True)
 
-                # Follows Javascript pattern of accessing URLs
-                g_host = url
-                g_protocol = ''
-                g_pathname = ''
+        google_results = _update_google_results(
+            _google_subdomain_lookup(
+                name,
+                [sub for sub in list_of_sub_ordered_by_count if sub != name],
+                100,
+                0
+            ),
+            google_results
+        )
 
-                temp = url.split('://')
+        print 'len ordered', len(list_of_sub_ordered_by_count), 'len original', len(google_results)
 
-                # If there is g_protocol e.g. http://, ftp://, etc
-                if len(temp) > 1:
-                    g_protocol = temp[0]
-                    # remove g_protocol from url
-                    url = ''.join(temp[1:])
+        for sub in google_results:
+            print sub,'-',str(google_results[sub].count)
 
-                temp = url.split('/')
-                # if there is a pathname after host
-                if len(temp) > 1:
+    return google_results
 
-                    g_pathname = '/'.join(temp[1:])
-                    g_host = temp[0]
+def _update_google_results(new_google_results, results_dictionary):
+    """Internal generator that manages multiple _google_subdomain_lookup"""
+    for url in new_google_results:
+        # Removing html tags from inside url (sometimes they use <b> or <i> for ads)
+        url = re.sub('<.*?>', '', url)
 
-                new_subdomains.add(g_host)
+        # Follows Javascript pattern of accessing URLs
+        g_host = url
+        g_protocol = ''
+        g_pathname = ''
 
-            # TODO do something with g_pathname and g_protocol
-            # Currently not using protocol or pathname for anything
-        return list(new_subdomains)
+        temp = url.split('://')
 
-    # Keeps subdomains found by _google_subdomains_lookup
-    subdomains_discovered = []
-    # Variable to check if there is any new result in the last iteration
-    subdomains_in_last_iteration = -1
+        # If there is g_protocol e.g. http://, ftp://, etc
+        if len(temp) > 1:
+            g_protocol = temp[0]
+            g_host = temp[1:]
 
-    while len(subdomains_discovered) > subdomains_in_last_iteration:
+        temp = ''.join(g_host).split('/')
 
-        subdomains_in_last_iteration = len(subdomains_discovered)
+        # if there is a pathname after host
+        if len(temp) > 1:
+            g_pathname = '/'.join(temp[1:])
+            g_host = temp[0]
 
-        subdomains_discovered += _google_subdomain_lookup(name, subdomains_discovered, 100, 0)
-        subdomains_discovered = list(set(subdomains_discovered))
+        results_dictionary.setdefault(g_host, GoogleDomainResult()).add_url(url)
 
-    subdomains_discovered += _google_subdomain_lookup(name, subdomains_discovered, 100, 100)
-    subdomains_discovered = list(set(subdomains_discovered))
-    return subdomains_discovered
+    return results_dictionary
 
+def _google_subdomain_lookup(domain, subs_to_avoid=(), num=100, counter=0):
+    """
+    Reaches out to google using the following query:
+    site:*.domain -site:subdomain_to_avoid1 -site:subdomain_to_avoid2 -site:subdomain_to_avoid3...
+
+    Returns list of unique subdomain strings
+    """
+    request = ''.join([
+        'http://google.com/search?hl=en&meta=&num=',
+        str(num),
+        '&start=',
+        str(counter),
+        '&q=',
+        'site%3A%2A',
+        domain
+    ])
+    
+    print 'Avoided subs:',subs_to_avoid[:8]
+
+    if subs_to_avoid:
+        for subdomain in subs_to_avoid[:8]:
+            request = ''.join([request, '%20%2Dsite%3A', str(subdomain)])
+
+    try:
+        return re.findall('<cite>(.+?)<\/cite>', requests.get(request).text)
+    except requests.ConnectionError as e:
+        log.error(e, sys._getframe().f_code.co_name)
+        raise log.NoInternetAccess
+
+
+class GoogleDomainResult(object):
+    """
+    Holds Google results for each domain.
+
+    Keyword arguments:
+    urls -- Set of urls for this domain
+    count -- Integer for how many times this was found in google
+    """
+    def __init__(self):
+        self.urls = set()
+        self.count = 0
+
+    def add_url(self, url):
+        self.urls.add(url)
+        self.count += 1

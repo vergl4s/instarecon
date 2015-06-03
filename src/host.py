@@ -181,30 +181,32 @@ class Host(object):
         self._add_to_subdomains_if_valid(subdomains_as_hosts=[new_host])
 
     def google_lookups(self):
-        """
-        Google queries to find related subdomains and linkedin pages. Testing.
-        """
-        if self.domain:
+        """Does all Google queries"""
+
+        self.google_linkedin_page()
+
+        self.google_subdomains()
+
+        return self
+
+    def google_linkedin_page(self):
+        """Finds the most likely linkedin page for self"""
+
+        if self.type == 'domain':
             self.linkedin_page = lookup.google_linkedin_page(self.domain)
 
-            self._add_to_subdomains_if_valid(subdomains_as_str=lookup.google_subdomains(self.domain))
+    def google_subdomains(self):
+        """Find as many subdomains from google as possible"""
 
-            return self
+        self._add_to_subdomains_if_valid([Host(domain=subdomain).dns_lookups() for subdomain in lookup.google_subdomains(self.domain)])
 
-    def _add_to_subdomains_if_valid(self, subdomains_as_str=None, subdomains_as_hosts=None):
+    def _add_to_subdomains_if_valid(self, subdomains_as_hosts=None):
         """
-        Add Hosts from subdomains_as_str or subdomains_as_hosts to self.subdomains if indeed these hosts are subdomains
-        subdomains_as_hosts and subdomains_as_str should be iterable list or set
+        Add Hosts from subdomains_as_hosts to self.subdomains if indeed these hosts are subdomains
         """
-        if subdomains_as_str:
-            self.subdomains.update(
-                [Host(domain=subdomain).dns_lookups() for subdomain in subdomains_as_str if self._is_parent_domain_of(subdomain)]
-            )
-
-        elif subdomains_as_hosts:
-            self.subdomains.update(
-                [subdomain for subdomain in subdomains_as_hosts if self._is_parent_domain_of(subdomain)]
-            )
+        self.subdomains.update(
+            [subdomain for subdomain in subdomains_as_hosts if self._is_parent_domain_of(subdomain)]
+        )
 
     def _is_parent_domain_of(self, subdomain):
         """
