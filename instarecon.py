@@ -28,7 +28,7 @@ class InstaRecon(object):
     entry_banner = '# InstaRecon v' + __version__ + ' - by Luis Teixeira (teix.co)'
     exit_banner = '# Done'
 
-    def __init__(self, nameserver=None, timeout=None, shodan_key=None, verbose=False, dns_only=False):
+    def __init__(self, nameserver=None, timeout=None, shodan_key=None, verbose=0, dns_only=False):
 
         if nameserver:
             lookup.dns_resolver.nameservers = [nameserver]
@@ -107,7 +107,7 @@ class InstaRecon(object):
         print ''
         print '# DNS lookups'
 
-        host.dns_lookups()
+        host.lookup_dns()
         if host.domain:
             print '[*] Domain: ' + host.domain
 
@@ -117,14 +117,14 @@ class InstaRecon(object):
             print '[*] IPs & reverse DNS: '
             print host.print_all_ips()
 
-        host.ns_dns_lookup()
+        host.lookup_dns_ns()
         # NS records
         if host.ns:
             print ''
             print '[*] NS records:'
             print host.print_all_ns()
 
-        host.mx_dns_lookup()
+        host.lookup_dns_mx()
         # MX records
         if host.mx:
             print ''
@@ -134,13 +134,13 @@ class InstaRecon(object):
         print ''
         print '# Whois lookups'
 
-        host.whois_domain_lookup()
+        host.lookup_whois_domain()
         if host.whois_domain:
             print ''
             print '[*] Whois domain:'
             print host.whois_domain
 
-        host.whois_ip_all_ips()
+        host.lookup_whois_ip_all()
         for ip in host.ips:
             m = ip.print_whois_ip()
             if m:
@@ -154,7 +154,7 @@ class InstaRecon(object):
             print ''
             print '# Querying Shodan for open ports'
 
-            host.shodan_all_ips()
+            host.lookup_shodan_all()
 
             m = host.print_all_shodan()
             if m:
@@ -176,7 +176,7 @@ class InstaRecon(object):
             else:
                 print '[-] Error: No subdomains found in Google. If you are scanning a lot, Google might be blocking your requests.'
 
-        # DNS lookups on entire CIDRs taken from host.whois_ip_all_ips()
+        # DNS lookups on entire CIDRs taken from host.lookup_whois_ip_all()
         if host.cidrs:
             print ''
             print '# Reverse DNS lookup on range {}'.format(', '.join([str(cidr) for cidr in host.cidrs]))
@@ -188,7 +188,7 @@ class InstaRecon(object):
         print ''
         print '# _________________ DNS lookups on {} _________________ #'.format(str(host))
 
-        host.dns_lookups()
+        host.lookup_dns()
         if host.domain:
             print ''
             print host.print_dns_only()
@@ -292,7 +292,7 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--nameserver', required=False, nargs='?', help='alternative DNS server to query')
     parser.add_argument('-s', '--shodan_key', required=False, nargs='?', help='shodan key for automated port/service information')
     parser.add_argument('-t', '--timeout', required=False, nargs='?', type=float, help='timeout for lookups (default is 2s)')
-    parser.add_argument('-v', '--verbose', action='store_true', help='verbose errors')
+    parser.add_argument('-v', '--verbose', action='count', default=0, help='verbose errors (-vv for warnings)')
     parser.add_argument('-d', '--dns_only', action='store_true', help='direct and reverse DNS lookups only')
 
     args = parser.parse_args()
