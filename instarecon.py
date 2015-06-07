@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import argparse
 import csv
+import logging
 import os
 import sys
 
@@ -29,20 +30,27 @@ class InstaRecon(object):
     exit_banner = '# Done'
 
     def __init__(self, nameserver=None, timeout=None, shodan_key=None, verbose=0, dns_only=False):
+        
+        self.dns_only = dns_only
+        self.targets = set()
+        self.bad_targets = set()
 
         if nameserver:
             lookup.dns_resolver.nameservers = [nameserver]
         if timeout:
             lookup.dns_resolver.timeout = timeout
             lookup.dns_resolver.lifetime = timeout
-        self.dns_only = dns_only
-        self.targets = set()
-        self.bad_targets = set()
+        if shodan_key:
+            lookup.shodan_key = shodan_key
 
-        log.feedback = True
-        log.verbose = verbose
+        # https://docs.python.org/2/library/logging.html#logging-levels
+        logging_level = 40 #ERROR
+        if verbose == 1:
+            logging_level = 30 #WARNING
+        elif verbose > 1:
+            logging_level = 10 #INFO
 
-        lookup.shodan_key = shodan_key
+        logging.basicConfig(format='[-] %(levelname)s: %(message)s', level=logging_level)
 
     def populate(self, user_supplied_list):
         for user_supplied in user_supplied_list:
@@ -82,7 +90,7 @@ class InstaRecon(object):
             self.targets.add(Host(domain=user_supplied))
             return
         except ValueError as e:
-            print '[-] Couldn\'t resolve or understand -', user_supplied
+            logging.critical('Couldn\'t resolve or understand ' + user_supplied)
             pass
 
         self.bad_targets.add(user_supplied)
@@ -174,7 +182,7 @@ class InstaRecon(object):
             if host.subdomains:
                 print '[*] Subdomains:' + '\n' + host.print_subdomains()
             else:
-                print '[-] Error: No subdomains found in Google. If you are scanning a lot, Google might be blocking your requests.'
+                logging.error('No subdomains found in Google. If you are scanning a lot, Google might be blocking your requests.')
 
         # DNS lookups on entire CIDRs taken from host.lookup_whois_ip_all()
         if host.cidrs:
@@ -288,14 +296,16 @@ if __name__ == '__main__':
         scan.scan_targets()
 
     except KeyboardInterrupt:
-        scan.exit_banner = '[-] Scan interrupted'
+        logging.error('Scan interrupted')
 
-    except (log.NoInternetAccess):
-        scan.exit_banner = '[-] Something went wrong. Sure you got internet connection?'
+    except (lookup.NoInternetAccess):
+        logging.critical('Something went wrong. Sure you got internet connection?')
+        sys.exit()
 
     except IOError:
         # don't want to run last lines if there's an IOError, so sys.exit
-        sys.exit('[-] Can\'t write to file.. Better not start scanning anything, right?')
+        logging.critical('Can\'t write to file.. Better not start scanning anything, right?')
+        sys.exit()
 
     scan.write_output_csv(args.output)
     print scan.exit_banner

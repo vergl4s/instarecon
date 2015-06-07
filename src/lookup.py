@@ -1,16 +1,15 @@
 #!/usr/bin/env python
 
 """
-Module wraps all lookups done by InstaRecon and returns only results.
+Module wraps all lookups done by InstaRecon and returns results only.
 
-Raises log.NoInternetAccess.
+Raises lookup.NoInternetAccess.
 
 """
-
+import logging
 from random import randint
 import re
 import socket
-import sys
 import time
 
 import dns.resolver
@@ -37,12 +36,6 @@ dns_timeout = (dns.exception.Timeout)
 
 shodan_key = None
 
-InterruptExceptions = (
-    KeyboardInterrupt,
-    ipw.ipwhois.WhoisLookupError,
-    shodan_api.client.APIError
-    )
-
 def direct_dns(name):
     return dns_lookup_manager(name,'A')
 
@@ -68,49 +61,51 @@ def dns_lookup_manager(target, lookup_type):
             
             elif lookup_type == 'MX':
                 return dns_resolver.query(target, 'MX')
-            
+
             elif lookup_type == 'NS':
                 return dns_resolver.query(target, 'NS')
 
         except dns_exceptions as e:
-            log.error(lookup_type + ' DNS lookup failed for ' + target, sys._getframe().f_code.co_name)
+            logging.warning(lookup_type + ' DNS lookup failed for ' + target)
             return ()
 
         except dns_timeout as e:
             tries += 1
             if tries < dns_maximum_retries:
-                log.error('Timeout resolving ' + target + '. Retrying.', sys._getframe().f_code.co_name)
+                logging.warning('Timeout resolving ' + target + '. Retrying.')
             else:
-                log.error(str(dns_maximum_retries)+ ' timeouts resolving ' + target + '. Giving up.', sys._getframe().f_code.co_name)    
-                raise log.NoInternetAccess
+                logging.warning(str(dns_maximum_retries)+ ' timeouts trying to resolve ' + target + '. Giving up.')
+                raise NoInternetAccess
 
 def whois_domain(name):
     try:
         query = whois.get_whois(name)
         if 'raw' in query:
             return query['raw'][0].split('<<<')[0].lstrip().rstrip()
+
     except socket.gaierror as e:
-        log.error('Whois lookup failed for ' + name, sys._getframe().f_code.co_name)
+        logging.warning('Whois lookup failed for ' + name)
 
 def whois_ip(ip):
     if ip_is_valid(ip):
         try:
-            return ipw.IPWhois(ip).lookup()# or None
+            return ipw.IPWhois(ip).lookup()
 
         except ipw.WhoisLookupError as e:
             raise KeyboardInterrupt
 
         except ipw.ipwhois.IPDefinedError as e:
-            log.error(e, sys._getframe().f_code.co_name)
+            logging.warning(e)
 
 def shodan(ip):
     if ip_is_valid(ip):
+        
         try:
             api = shodan_api.Shodan(shodan_key)
             return api.host(str(ip))
         
         except socket.gaierror as e:
-            log.error(e, sys._getframe().f_code.co_name)
+            logging.warning(e)
         
         except shodan_api.client.APIError as e:
             raise KeyboardInterrupt
@@ -133,6 +128,7 @@ def rev_dns_on_cidr(cidr):
     """
     if not isinstance(cidr, ipa.IPv4Network):
        raise ValueError
+
     else:
         for ip in cidr:
             lookup_result = None
@@ -152,9 +148,9 @@ def google_linkedin_page(name):
     
     try:
         google_search = requests.get(request)
-    except Exception as e:
-        log.error(e, sys._getframe().f_code.co_name)
-        raise log.NoInternetAccess
+    except requests.ConnectionError as e:
+        logging.warning(e)
+        raise NoInternetAccess
     
     google_results = re.findall('<cite>(.+?)<\/cite>', google_search.text)
     for url in google_results:
@@ -190,10 +186,10 @@ def google_subdomains(name):
             google_results
         )
 
-        print 'len ordered', len(list_of_sub_ordered_by_count), 'len original', len(google_results)
+        logging.debug('len ordered' + str(len(list_of_sub_ordered_by_count)) + ' len original ' + str(len(google_results)))
 
         for sub in google_results:
-            print sub,'-',str(google_results[sub].count)
+            logging.debug(sub + ' - ' + str(google_results[sub].count))
 
     return google_results
 
@@ -243,7 +239,7 @@ def _google_subdomain_lookup(domain, subs_to_avoid=(), num=100, counter=0):
         domain
     ])
     
-    print 'Avoided subs:',subs_to_avoid[:8]
+    logging.debug('Avoided subs:' + str(subs_to_avoid[:8]))
 
     if subs_to_avoid:
         for subdomain in subs_to_avoid[:8]:
@@ -252,9 +248,8 @@ def _google_subdomain_lookup(domain, subs_to_avoid=(), num=100, counter=0):
     try:
         return re.findall('<cite>(.+?)<\/cite>', requests.get(request).text)
     except requests.ConnectionError as e:
-        log.error(e, sys._getframe().f_code.co_name)
-        raise log.NoInternetAccess
-
+        logging.warning(e)
+        raise NoInternetAccess
 
 class GoogleDomainResult(object):
     """
@@ -271,3 +266,6 @@ class GoogleDomainResult(object):
     def add_url(self, url):
         self.urls.add(url)
         self.count += 1
+
+class NoInternetAccess(Exception):
+    pass

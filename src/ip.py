@@ -6,7 +6,6 @@ import time
 import ipaddress as ipa  # https://docs.python.org/3/library/ipaddress.html
 
 import lookup
-import log
 
 class IP(object):
     """

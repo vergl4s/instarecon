@@ -3,7 +3,6 @@ import dns.name  # http://www.dnspython.org/docs/1.12.0/
 import ipaddress as ipa  # https://docs.python.org/3/library/ipaddress.html
 
 from ip import IP
-import log
 import lookup
 
 class Host(object):
