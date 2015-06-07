@@ -221,6 +221,13 @@ class InstaRecon(object):
         if not target.related_hosts:
             print '# No results for this range'
 
+    def test_output_csv(self, filename=None):
+        """Test if file is writable before running any scan"""
+        if filename:
+            with open(filename, 'wb') as f:
+                # If file ain't writable raises an IOError, which is caught in main
+                pass
+
     def write_output_csv(self, filename=None):
         """Writes output for each target as csv in filename"""
         if filename:
@@ -235,22 +242,13 @@ class InstaRecon(object):
                     output_as_lines.append(line)
                 output_as_lines.append(['\n'])
 
-            output_written = False
-            while not output_written:
+                with open(filename, 'wb') as f:
+                    writer = csv.writer(f)
 
-                try:
-                    with open(filename, 'wb') as f:
-                        writer = csv.writer(f)
+                    for line in output_as_lines:
+                        writer.writerow(line)
 
-                        for line in output_as_lines:
-                            writer.writerow(line)
-
-                        output_written = True
-
-                except Exception as e:
-                    error = '[-] Something went wrong, can\'t open output file. Press anything to try again.'
-                    error = ''.join([error, '\nError: ', str(e)])
-                    raw_input(error)
+                    output_written = True
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -285,15 +283,19 @@ if __name__ == '__main__':
 
     try:
         print scan.entry_banner
+        scan.test_output_csv(args.output)
         scan.populate(targets)
         scan.scan_targets()
 
     except KeyboardInterrupt:
-        scan.exit_banner = '# Scan interrupted'
+        scan.exit_banner = '[-] Scan interrupted'
 
     except (log.NoInternetAccess):
-        sys.exit('# Something went wrong. Sure you got internet connection?')
-    
-    finally:
-        scan.write_output_csv(args.output)
-        print scan.exit_banner
+        scan.exit_banner = '[-] Something went wrong. Sure you got internet connection?'
+
+    except IOError:
+        # don't want to run last lines if there's an IOError, so sys.exit
+        sys.exit('[-] Can\'t write to file.. Better not start scanning anything, right?')
+
+    scan.write_output_csv(args.output)
+    print scan.exit_banner
