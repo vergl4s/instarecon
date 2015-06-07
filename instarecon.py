@@ -214,7 +214,7 @@ class InstaRecon(object):
             generator = lookup.rev_dns_on_cidr(cidr)
             while True:
                 try:
-                    ip_or_exception = generator.next()
+                    ip_or_exception = next(generator)
                     
                     if isinstance(ip_or_exception, KeyboardInterrupt):
                         
@@ -227,7 +227,7 @@ class InstaRecon(object):
 
                     else:
                         ip = ip_or_exception
-                        reverse_domains = generator.next()
+                        reverse_domains = next(generator)
 
                         new_host = Host(ips=[ip], reverse_domains=reverse_domains)
                         target.add_related_host(new_host)
@@ -291,7 +291,7 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--output', required=False, nargs='?', help='output filename as csv')
     parser.add_argument('-n', '--nameserver', required=False, nargs='?', help='alternative DNS server to query')
     parser.add_argument('-s', '--shodan_key', required=False, nargs='?', help='shodan key for automated port/service information')
-    parser.add_argument('-t', '--timeout', required=False, nargs='?', type=float, help='timeout for lookups (default is 2s)')
+    parser.add_argument('-t', '--timeout', required=False, nargs='?', type=float, help='timeout for DNS lookups (default is 2s)')
     parser.add_argument('-v', '--verbose', action='count', default=0, help='verbose errors (-vv for warnings)')
     parser.add_argument('-d', '--dns_only', action='store_true', help='direct and reverse DNS lookups only')
 
