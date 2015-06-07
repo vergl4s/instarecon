@@ -231,15 +231,9 @@ class InstaRecon(object):
             output_as_lines = []
 
             for host in self.targets:
-                try:
-                    # Using generator to get one csv line at a time (one Host can yield multiple lines)
-                    generator = host.print_as_csv_lines()
-                    while True:
-                        output_as_lines.append(generator.next())
-
-                except StopIteration:
-                    # Space between targets
-                    output_as_lines.append(['\n'])
+                for line in host.print_as_csv_lines():
+                    output_as_lines.append(line)
+                output_as_lines.append(['\n'])
 
             output_written = False
             while not output_written:
@@ -257,10 +251,6 @@ class InstaRecon(object):
                     error = '[-] Something went wrong, can\'t open output file. Press anything to try again.'
                     error = ''.join([error, '\nError: ', str(e)])
                     raw_input(error)
-
-                except KeyboardInterrupt:
-                    if raw_input('[-] Sure you want to exit without saving your file (Y/n)?') in ['y', 'Y', '']:
-                        sys.exit('# Scan interrupted')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -297,10 +287,13 @@ if __name__ == '__main__':
         print scan.entry_banner
         scan.populate(targets)
         scan.scan_targets()
+
     except KeyboardInterrupt:
         scan.exit_banner = '# Scan interrupted'
+
     except (log.NoInternetAccess):
         sys.exit('# Something went wrong. Sure you got internet connection?')
+    
     finally:
         scan.write_output_csv(args.output)
         print scan.exit_banner

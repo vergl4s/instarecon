@@ -37,6 +37,12 @@ dns_timeout = (dns.exception.Timeout)
 
 shodan_key = None
 
+InterruptExceptions = (
+    KeyboardInterrupt,
+    ipw.ipwhois.WhoisLookupError,
+    shodan_api.client.APIError
+    )
+
 def direct_dns(name):
     return dns_lookup_manager(name,'A')
 
@@ -87,17 +93,38 @@ def whois_domain(name):
         log.error('Whois lookup failed for ' + name, sys._getframe().f_code.co_name)
 
 def whois_ip(ip):
-    try:
-         return ipw.IPWhois(ip).lookup() or None
-    except ipw.WhoisLookupError as e:
-        log.error(e, sys._getframe().f_code.co_name)
+    if ip_is_valid(ip):
+        try:
+            return ipw.IPWhois(ip).lookup()# or None
+
+        except ipw.WhoisLookupError as e:
+            raise KeyboardInterrupt
+
+        except ipw.ipwhois.IPDefinedError as e:
+            log.error(e, sys._getframe().f_code.co_name)
 
 def shodan(ip):
-    try:
-        api = shodan_api.Shodan(shodan_key)
-        return api.host(str(ip))
-    except (socket.gaierror, shodan_api.client.APIError) as e:
-        log.error(e, sys._getframe().f_code.co_name)
+    if ip_is_valid(ip):
+        try:
+            api = shodan_api.Shodan(shodan_key)
+            return api.host(str(ip))
+        
+        except socket.gaierror as e:
+            log.error(e, sys._getframe().f_code.co_name)
+        
+        except shodan_api.client.APIError as e:
+            raise KeyboardInterrupt
+
+def ip_is_valid(ip):
+    ip = ipa.ip_address(unicode(ip))
+    return not (
+        ip.is_multicast or 
+        ip.is_private or 
+        ip.is_reserved or 
+        ip.is_loopback or 
+        ip.is_link_local or
+        ip.is_unspecified
+    )
 
 def rev_dns_on_cidr(cidr):
     """
