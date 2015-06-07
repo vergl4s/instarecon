@@ -61,14 +61,14 @@ def dns_lookup_manager(target, lookup_type):
                 return dns_resolver.query(dns.reversename.from_address(target), 'PTR')
             
             elif lookup_type == 'MX':
-                return  dns_resolver.query(target, 'MX')
+                return dns_resolver.query(target, 'MX')
             
             elif lookup_type == 'NS':
                 return dns_resolver.query(target, 'NS')
 
         except dns_exceptions as e:
             log.error(lookup_type + ' DNS lookup failed for ' + target, sys._getframe().f_code.co_name)
-            break
+            return ()
 
         except dns_timeout as e:
             tries += 1
@@ -110,21 +110,10 @@ def rev_dns_on_cidr(cidr):
         for ip in cidr:
             lookup_result = None
 
-            # Used to repeat same scan if user issues KeyboardInterrupt
-            scan_completed = False
-            while not scan_completed:
-                try:
-
-                    lookup_result = reverse_dns(str(ip))
-                    if lookup_result:
-                        reverse_domains = [str(domain).rstrip('.') for domain in lookup_result]
-                        yield ip
-                        yield reverse_domains
-
-                    scan_completed = True
-
-                except KeyboardInterrupt as e:
-                    yield e
+            lookup_result = reverse_dns(str(ip))
+            if lookup_result:
+                reverse_domains = [str(domain).rstrip('.') for domain in lookup_result]
+                yield ip, reverse_domains
 
 def google_linkedin_page(name):
     """

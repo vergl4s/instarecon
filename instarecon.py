@@ -211,31 +211,12 @@ class InstaRecon(object):
             raise ValueError
 
         for cidr in cidrs:
-            generator = lookup.rev_dns_on_cidr(cidr)
-            while True:
-                try:
-                    ip_or_exception = next(generator)
-                    
-                    if isinstance(ip_or_exception, KeyboardInterrupt):
-                        
-                        if isinstance(target, Host):
-                            if raw_input('[-] Sure you want to stop scanning ' + str(cidr) +
-                                         '? Program flow will continue normally. (y/N):') in ['Y', 'y']:
-                                return                        
-                        elif isinstance(target, Network):
-                            raise KeyboardInterrupt
 
-                    else:
-                        ip = ip_or_exception
-                        reverse_domains = next(generator)
+            for ip, reverse_domains in lookup.rev_dns_on_cidr(cidr):
 
-                        new_host = Host(ips=[ip], reverse_domains=reverse_domains)
-                        target.add_related_host(new_host)
-
-                        print new_host.print_all_ips()
-                
-                except StopIteration:
-                    break
+                    new_host = Host(ips=[ip], reverse_domains=reverse_domains)
+                    target.add_related_host(new_host)
+                    print new_host.print_all_ips()
 
         if not target.related_hosts:
             print '# No results for this range'
@@ -316,9 +297,10 @@ if __name__ == '__main__':
         print scan.entry_banner
         scan.populate(targets)
         scan.scan_targets()
-        scan.write_output_csv(args.output)
-        print scan.exit_banner
     except KeyboardInterrupt:
-        sys.exit('# Scan interrupted')
+        scan.exit_banner = '# Scan interrupted'
     except (log.NoInternetAccess):
         sys.exit('# Something went wrong. Sure you got internet connection?')
+    finally:
+        scan.write_output_csv(args.output)
+        print scan.exit_banner
