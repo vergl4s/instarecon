@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import itertools
+import logging
 import os
 import random
 import unittest
@@ -9,7 +10,7 @@ import ipaddress
 from instarecon import *
 from src import lookup
 
-class HostTestCase(unittest.TestCase):
+class CHostTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -37,23 +38,24 @@ class HostTestCase(unittest.TestCase):
         [self.assertIsInstance(ip, IP) for ip in self.host.ips]
         self.assertIsInstance(self.host.ips, list)
         self.assertIsInstance(self.host.whois_domain, unicode)
-        self.assertIsInstance(self.host.cidrs,set)
+        self.assertIsInstance(self.host.cidrs, set)
         [self.assertIsInstance(cidr, ipaddress.IPv4Network) for cidr in self.host.cidrs]
+        self.assertIsInstance(self.host.google_results, set)
+        [self.assertIsInstance(host, Host) for host in self.host.google_results]
+        self.assertIsInstance(self.urls, set)
 
     def test_valid_results(self):
         self.assertTrue(self.host.domain)
         self.assertTrue(self.host.ips)
         self.assertTrue(self.host.whois_domain)
         self.assertTrue(self.host.cidrs)
-
-    def test_whois_domain(self):
-        self.assertTrue(self.host.whois_domain)
+        self.assertTrue(self.host.urls)
 
     def test_cidrs_dont_overlap(self):
         for a,b in itertools.combinations(self.host.cidrs,2):
             self.assertFalse(a.overlaps(b))
 
-class IPTestCase(unittest.TestCase):
+class AIPTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -101,7 +103,7 @@ class IPTestCase(unittest.TestCase):
         ]
         self.assertEquals(len(IP._remove_overlaping_cidrs(cidrs)),4)
 
-class NetworkTestCase(unittest.TestCase):
+class BNetworkTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -117,5 +119,6 @@ class NetworkTestCase(unittest.TestCase):
         self.assertTrue(self.network.related_hosts)
 
 if __name__ == '__main__':
+    logging.basicConfig(level=40)
     lookup.shodan_key = os.getenv('SHODAN_KEY')
     unittest.main()

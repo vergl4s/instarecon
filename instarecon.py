@@ -47,8 +47,10 @@ class InstaRecon(object):
         logging_level = 40 #ERROR
         if verbose == 1:
             logging_level = 30 #WARNING
-        elif verbose > 1:
-            logging_level = 10 #INFO
+        elif verbose == 2:
+            logging_level = 20 #INFO
+        elif verbose > 2:
+            logging_level = 10 #DEBUG
 
         logging.basicConfig(format='[-] %(levelname)s: %(message)s', level=logging_level)
 
@@ -233,7 +235,7 @@ class InstaRecon(object):
         """Test if file is writable before running any scan"""
         if filename:
             with open(filename, 'wb') as f:
-                # If file ain't writable raises an IOError, which is caught in main
+                # If file isn't writable this raises an IOError, which is caught in main
                 pass
 
     def write_output_csv(self, filename=None):
@@ -303,7 +305,6 @@ if __name__ == '__main__':
         sys.exit()
 
     except IOError:
-        # don't want to run last lines if there's an IOError, so sys.exit
         logging.critical('Can\'t write to file.. Better not start scanning anything, right?')
         sys.exit()
 

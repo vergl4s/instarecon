@@ -66,7 +66,10 @@ def dns_lookup_manager(target, lookup_type):
                 return dns_resolver.query(target, 'NS')
 
         except dns_exceptions as e:
-            logging.warning(lookup_type + ' DNS lookup failed for ' + target)
+            if lookup_type == 'PTR':
+                logging.info(lookup_type + ' lookup failed for ' + target)
+            else:
+                logging.warning(lookup_type + ' lookup failed for ' + target)
             return ()
 
         except dns_timeout as e:
@@ -107,7 +110,8 @@ def shodan(ip):
         except socket.gaierror as e:
             logging.warning(e)
         
-        except shodan_api.client.APIError as e:
+        except shodan_api.exception.APIError as e:
+            logging.warning(e)
             raise KeyboardInterrupt
 
 def ip_is_valid(ip):
@@ -144,7 +148,7 @@ def google_linkedin_page(name):
 
     Google query is "site:linkedin.com/company name", and first result is used
     """
-    request = 'http://google.com/search?hl=en&meta=&num=10&q=site:linkedin.com/company%20"' + name + '"'
+    request = 'http://google.com/search?num=10&q=site:linkedin.com/company%20"' + name + '"'
     
     try:
         google_search = requests.get(request)
@@ -186,10 +190,10 @@ def google_subdomains(name):
             google_results
         )
 
-        logging.debug('len ordered' + str(len(list_of_sub_ordered_by_count)) + ' len original ' + str(len(google_results)))
+        logging.debug('New subdomain(s) found: ' + str(len(google_results)-len(list_of_sub_ordered_by_count)))
+        [logging.debug(sub + ' - ' + str(google_results[sub].count)) for sub in sorted(google_results, key = lambda sub: google_results[sub].count, reverse=True)]
 
-        for sub in google_results:
-            logging.debug(sub + ' - ' + str(google_results[sub].count))
+    logging.debug('Finished google lookups with '+str(len(google_results))+' subdomains discovered.')
 
     return google_results
 
@@ -235,11 +239,11 @@ def _google_subdomain_lookup(domain, subs_to_avoid=(), num=100, counter=0):
         '&start=',
         str(counter),
         '&q=',
-        'site%3A%2A',
-        domain
+        'site%3A%2A%2E',
+        domain,
     ])
     
-    logging.debug('Avoided subs:' + str(subs_to_avoid[:8]))
+    logging.info('Subs removed from next query: ' + ', '.join(subs_to_avoid[:8]))
 
     if subs_to_avoid:
         for subdomain in subs_to_avoid[:8]:

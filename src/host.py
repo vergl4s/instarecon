@@ -21,11 +21,12 @@ class Host(object):
     mx -- Set of Hosts for each DNS MX entry for original self.domain
     ns -- Set of Hosts for each DNS NS entry for original self.domain
     whois_domain -- str representation of the Whois query
-    subdomains -- Set of Hosts for each related Host found that is a subdomain of self.domain
     linkedin_page -- Str of LinkedIn url that contains domain in html
+    urls -- set of urls found in google results for this domain
     related_hosts -- Set of Hosts that may be related to host, as they're part of the same cidrs
+    subdomains -- Set of Hosts for each related Host found that is a subdomain of self.domain
     cidrs -- set of ipa.IPv4Network objects related to each ip.cidrs
-    urls -- set of urls found in google results
+    google_results -- set of Hosts found through google dorks
     """
 
     def __init__(self, domain=None, ips=(), reverse_domains=()):
@@ -55,11 +56,13 @@ class Host(object):
         self.mx = set()
         self.ns = set()
         self.whois_domain = None
-        self.subdomains = set()
         self.linkedin_page = None
-        self.related_hosts = set()
-        self.cidrs = set()
         self.urls = set()
+
+        self.related_hosts = set()
+        self.subdomains = set()
+        self.cidrs = set()
+        self.google_results = set()
 
     def __str__(self):
         if self.type == 'domain':
