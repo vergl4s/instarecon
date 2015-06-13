@@ -108,11 +108,13 @@ def shodan(ip):
             return api.host(str(ip))
         
         except socket.gaierror as e:
-            logging.warning(e)
+            logging.warning('Shodan lookup failed for ' + ip)
         
         except shodan_api.exception.APIError as e:
             logging.warning(e)
-            raise KeyboardInterrupt
+            if e.value != u'No information available for that IP.':
+                raise KeyboardInterrupt
+                # Other possible is 'Unable to connect to Shodan'         
 
 def ip_is_valid(ip):
     ip = ipa.ip_address(unicode(ip))
