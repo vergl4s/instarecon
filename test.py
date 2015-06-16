@@ -38,22 +38,29 @@ class CHostTestCase(unittest.TestCase):
         [self.assertIsInstance(ip, IP) for ip in self.host.ips]
         self.assertIsInstance(self.host.ips, list)
         self.assertIsInstance(self.host.whois_domain, unicode)
+        self.assertIsInstance(self.host.google_subdomains, set)
+        self.assertIsInstance(self.host.subdomains, set)
         self.assertIsInstance(self.host.cidrs, set)
         [self.assertIsInstance(cidr, ipaddress.IPv4Network) for cidr in self.host.cidrs]
-        self.assertIsInstance(self.host.google_results, set)
         [self.assertIsInstance(host, Host) for host in self.host.google_results]
-        self.assertIsInstance(self.urls, set)
+        self.assertIsInstance(self.host.urls, dict)
 
     def test_valid_results(self):
         self.assertTrue(self.host.domain)
         self.assertTrue(self.host.ips)
         self.assertTrue(self.host.whois_domain)
         self.assertTrue(self.host.cidrs)
-        self.assertTrue(self.host.urls)
 
     def test_cidrs_dont_overlap(self):
         for a,b in itertools.combinations(self.host.cidrs,2):
             self.assertFalse(a.overlaps(b))
+
+    def test_google_lookups(self):
+        new_host = Host('google.co')
+        new_host.google_lookups()
+        self.assertTrue(new_host.linkedin_page)
+        self.assertTrue(new_host.subdomains)
+        self.assertTrue(Host('www.google.co') in new_host.subdomains)
 
 class AIPTestCase(unittest.TestCase):
 

@@ -181,8 +181,8 @@ class InstaRecon(object):
             if host.linkedin_page:
                 print '[*] Possible LinkedIn page: ' + host.linkedin_page
 
-            if host.subdomains:
-                print '[*] Subdomains:' + '\n' + host.print_subdomains()
+            if host.google_subdomains:
+                print '[*] Subdomains:' + '\n' + host.print_google_subdomains()
             else:
                 logging.error('No subdomains found in Google. If you are scanning a lot, Google might be blocking your requests.')
 

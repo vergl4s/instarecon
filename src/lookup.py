@@ -99,10 +99,11 @@ def whois_ip(ip):
 
         except ipw.ipwhois.IPDefinedError as e:
             logging.warning(e)
+    else:
+        logging.warning('No Whois IP for ' + ip + ' as it doesn\'t seem to be an IP on the internet')
 
 def shodan(ip):
     if ip_is_valid(ip):
-        
         try:
             api = shodan_api.Shodan(shodan_key)
             return api.host(str(ip))
@@ -114,7 +115,9 @@ def shodan(ip):
             logging.warning(e)
             if e.value != u'No information available for that IP.':
                 raise KeyboardInterrupt
-                # Other possible is 'Unable to connect to Shodan'         
+                # Other possible is 'Unable to connect to Shodan'
+    else:
+        logging.warning('No Shodan for ' + ip + ' as it doesn\'t seem to be an IP on the internet')
 
 def ip_is_valid(ip):
     ip = ipa.ip_address(unicode(ip))
@@ -214,17 +217,19 @@ def _update_google_results(new_google_results, results_dictionary):
 
         # If there is g_protocol e.g. http://, ftp://, etc
         if len(temp) > 1:
-            g_protocol = temp[0]
+            g_protocol = temp[0] + '://'
             g_host = temp[1:]
+        else:
+            g_protocol = 'http://'
 
         temp = ''.join(g_host).split('/')
 
         # if there is a pathname after host
         if len(temp) > 1:
-            g_pathname = '/'.join(temp[1:])
+            g_pathname = ''.join(['/', '/'.join(temp[1:])])
             g_host = temp[0]
 
-        results_dictionary.setdefault(g_host, GoogleDomainResult()).add_url(url)
+        results_dictionary.setdefault(g_host, GoogleDomainResult()).add_url(g_protocol, g_pathname)
 
     return results_dictionary
 
@@ -262,15 +267,16 @@ class GoogleDomainResult(object):
     Holds Google results for each domain.
 
     Keyword arguments:
-    urls -- Set of urls for this domain
+    urls -- dict with key=protocol value=set of pathnames of urls for this domain
+            Example - {'http://':{'/','/home','/test/asd.html'}}
     count -- Integer for how many times this was found in google
     """
     def __init__(self):
-        self.urls = set()
+        self.urls = {}
         self.count = 0
 
-    def add_url(self, url):
-        self.urls.add(url)
+    def add_url(self, g_protocol, g_pathname):
+        self.urls.setdefault(g_protocol, set()).add(g_pathname)
         self.count += 1
 
 class NoInternetAccess(Exception):

@@ -22,11 +22,11 @@ class Host(object):
     ns -- Set of Hosts for each DNS NS entry for original self.domain
     whois_domain -- str representation of the Whois query
     linkedin_page -- Str of LinkedIn url that contains domain in html
-    urls -- set of urls found in google results for this domain
+    urls -- dict of protocol:pathnames found in google results for this domain
     related_hosts -- Set of Hosts that may be related to host, as they're part of the same cidrs
     subdomains -- Set of Hosts for each related Host found that is a subdomain of self.domain
+    google_subdomains -- set of Hosts found through google dorks
     cidrs -- set of ipa.IPv4Network objects related to each ip.cidrs
-    google_results -- set of Hosts found through google dorks
     """
 
     def __init__(self, domain=None, ips=(), reverse_domains=()):
@@ -57,12 +57,12 @@ class Host(object):
         self.ns = set()
         self.whois_domain = None
         self.linkedin_page = None
-        self.urls = set()
+        self.urls = {}
 
         self.related_hosts = set()
         self.subdomains = set()
+        self.google_subdomains = set()
         self.cidrs = set()
-        self.google_results = set()
 
     def __str__(self):
         if self.type == 'domain':
@@ -112,7 +112,7 @@ class Host(object):
             mx_list = lookup.mx_dns(self.domain)
             if mx_list:
                 self.mx.update([Host(domain=mx).lookup_dns() for mx in mx_list])
-                self._add_to_subdomains_if_valid(subdomains_as_hosts=self.mx)
+                self._add_to_subdomains_if_valid(self.mx)
         return self
 
     def lookup_dns_ns(self):
@@ -123,7 +123,7 @@ class Host(object):
             ns_list = lookup.ns_dns(self.domain)
             if ns_list:
                 self.ns.update([Host(domain=ns).lookup_dns() for ns in ns_list])
-                self._add_to_subdomains_if_valid(subdomains_as_hosts=self.ns)
+                self._add_to_subdomains_if_valid(self.ns)
         return self
 
     def lookup_dns_rev_all(self):
@@ -180,14 +180,14 @@ class Host(object):
 
     def add_related_host(self, new_host):
         self.related_hosts.add(new_host)
-        self._add_to_subdomains_if_valid(subdomains_as_hosts=[new_host])
+        self._add_to_subdomains_if_valid([new_host])
 
     def google_lookups(self):
         """Does all Google queries"""
 
         self.google_linkedin_page()
 
-        self.google_subdomains()
+        self.lookup_google_subdomains()
 
         return self
 
@@ -197,12 +197,31 @@ class Host(object):
         if self.type == 'domain':
             self.linkedin_page = lookup.google_linkedin_page(self.domain)
 
-    def google_subdomains(self):
+    def lookup_google_subdomains(self):
         """Find as many subdomains from google as possible"""
+        # Dict of subdomain_str:GoogleDomainResult for each subdomain found
+        subdomains = lookup.google_subdomains(self.domain)
 
-        self._add_to_subdomains_if_valid([Host(domain=subdomain).lookup_dns() for subdomain in lookup.google_subdomains(self.domain)])
+        subdomains_as_hosts = set([])
 
-    def _add_to_subdomains_if_valid(self, subdomains_as_hosts=None):
+        for sub_str, google_results in subdomains.iteritems():
+                if sub_str == self.domain:
+                    self.urls = google_results.urls
+                else:
+                    try:
+                        sub = Host(domain=sub_str).lookup_dns()
+                        sub.urls = google_results.urls
+                        subdomains_as_hosts.add(sub)
+                    except ValueError as e: # in case it can't be resolved
+                        pass
+
+        # Hold subdomains in self.google_subdomains
+        self.google_subdomains.update(subdomains_as_hosts)
+
+        # Pass subdomains to set in self.subdomains as well
+        self._add_to_subdomains_if_valid(subdomains_as_hosts)
+
+    def _add_to_subdomains_if_valid(self, subdomains_as_hosts):
         """
         Add Hosts from subdomains_as_hosts to self.subdomains if indeed these hosts are subdomains
         """
@@ -243,12 +262,19 @@ class Host(object):
 
         return False
 
-    def print_all_ips(self):
-        if self.ips:
-            return '\n'.join([ip.print_ip() for ip in self.ips]).rstrip()
-
-    def print_subdomains(self):
-        return self._print_domains(sorted(self.subdomains, key=lambda x: x.domain))
+    def do_all_lookups(self, shodan_key=None):
+        """
+        This method does all possible direct lookups for a Host.
+        Not called by any Host or Scan function, only here for testing purposes.
+        """
+        self.lookup_dns()
+        self.lookup_dns_ns()
+        self.lookup_dns_mx()
+        self.lookup_whois_domain()
+        self.lookup_whois_ip_all()
+        if shodan_key:
+            self.lookup_shodan_all(shodan_key)
+        self.google_lookups()
 
     @staticmethod
     def _print_domains(hosts):
@@ -260,13 +286,35 @@ class Host(object):
 
                 ret = ''.join([ret, host.domain])
 
-                p = host.print_all_ips()
-                if p:
-                    ret = ''.join([ret, '\n\t', p.replace('\n', '\n\t')])
+                ips = host.print_all_ips()
+                if ips:
+                    ret = ''.join([ret, '\n\t', ips.replace('\n', '\n\t')])
+                
+                urls = host.print_all_urls()
+                if urls:
+                    ret = ''.join([ret, '\n\t', urls.replace('\n','\n\t')])
 
                 ret = ''.join([ret, '\n'])
 
             return ret.rstrip().lstrip()
+    
+    def print_all_ips(self):
+        if self.ips:
+            return '\n'.join([ip.print_ip() for ip in self.ips]).rstrip()
+
+    def print_all_urls(self):
+        if self.urls:
+            ret = ''
+            for proto, paths in self.urls.iteritems():
+                for path in sorted(paths):
+                    ret = ''.join([ret, '\n', proto, self.domain, path])
+            return ret.rstrip().lstrip()
+
+    def print_subdomains(self):
+        return self._print_domains(sorted(self.subdomains, key=lambda x: x.domain))
+
+    def print_google_subdomains(self):
+        return self._print_domains(sorted(self.google_subdomains, key=lambda x: x.domain))
 
     def print_all_ns(self):
         # Print all NS records
@@ -347,18 +395,4 @@ class Host(object):
                     ','.join([str(ip) for ip in sub.ips]),
                     ','.join([','.join(ip.rev_domains) for ip in sub.ips]),
                 ]
-
-    def do_all_lookups(self, shodan_key=None):
-        """
-        This method does all possible direct lookups for a Host.
-        Not called by any Host or Scan function, only here for testing purposes.
-        """
-        self.lookup_dns()
-        self.lookup_dns_ns()
-        self.lookup_dns_mx()
-        self.lookup_whois_domain()
-        self.lookup_whois_ip_all()
-        if shodan_key:
-            self.lookup_shodan_all(shodan_key)
-        self.google_lookups()
 
