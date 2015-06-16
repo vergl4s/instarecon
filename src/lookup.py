@@ -257,7 +257,11 @@ def _google_subdomain_lookup(domain, subs_to_avoid=(), num=100, counter=0):
             request = ''.join([request, '%20%2Dsite%3A', str(subdomain)])
 
     try:
-        return re.findall('<cite>(.+?)<\/cite>', requests.get(request).text)
+        # Content within cite had url shortening features where '/.../' would appear in the middle of the url
+        #return re.findall('<cite>(.+?)<\/cite>', requests.get(request).text)
+
+        return re.findall('<h3 class\=\"r\"><a href=\"/url\?q\=(.+?)\&amp', requests.get(request).text)
+        
     except requests.ConnectionError as e:
         logging.warning(e)
         raise NoInternetAccess
