@@ -42,7 +42,8 @@ class CHostTestCase(unittest.TestCase):
         self.assertIsInstance(self.host.subdomains, set)
         self.assertIsInstance(self.host.cidrs, set)
         [self.assertIsInstance(cidr, ipaddress.IPv4Network) for cidr in self.host.cidrs]
-        [self.assertIsInstance(host, Host) for host in self.host.google_results]
+        [self.assertIsInstance(host, Host) for host in self.host.subdomains]
+        [self.assertIsInstance(host, Host) for host in self.host.google_subdomains]
         self.assertIsInstance(self.host.urls, dict)
 
     def test_valid_results(self):
