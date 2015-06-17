@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import dns.name  # http://www.dnspython.org/docs/1.12.0/
 import ipaddress as ipa  # https://docs.python.org/3/library/ipaddress.html
+import logging
 
 from ip import IP
 import lookup
@@ -160,8 +161,11 @@ class Host(object):
                     # Note cidr already found is not saved in new ips, as it isn't really necessary
                     ip.whois_ip = whois_ip
                     cidr_found = True
+                    logging.info('Results for ' + str(ip) + ' already found in cidr ' + str(cidr))
                     break
+                
             if not cidr_found:
+                logging.debug('Performing Whois IP lookup for ' + str(ip))
                 ip.lookup_whois_ip()
                 for cidr in ip.cidrs:
                     cidrs_found[cidr] = ip.whois_ip
@@ -329,12 +333,19 @@ class Host(object):
 
     def print_all_whois_ip(self):
         # Prints whois_ip records related to all self.ips
-        ret = set([ip.print_whois_ip() for ip in self.ips if ip.whois_ip])
-        return '\n'.join(ret).lstrip().rstrip()
+        # kind of a hack, since it returns a list instead of strings
+        results = {}
+        ret = []
+        for ip in self.ips:
+            whois_ip = ip.print_whois_ip()
+            if whois_ip:
+                results.setdefault(whois_ip, set()).add(str(ip))
+        for whois_ip, set_of_ips in results.iteritems():
+            ret.append(''.join([', '.join(set_of_ips), ':\n', whois_ip]))
+        return ret
 
     def print_all_shodan(self):
         # Print all Shodan entries (one for each IP in self.ips)
-
         ret = [ip.print_shodan() for ip in self.ips if ip.shodan]
         return '\n'.join(ret).lstrip().rstrip()
 

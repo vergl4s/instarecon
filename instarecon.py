@@ -151,12 +151,11 @@ class InstaRecon(object):
             print host.whois_domain
 
         host.lookup_whois_ip_all()
-        for ip in host.ips:
-            m = ip.print_whois_ip()
-            if m:
+        m = host.print_all_whois_ip()
+        if m:
+            for result in m:
                 print ''
-                print '[*] Whois IP for '+str(ip)+':'
-                print m
+                print '[*] Whois IP for ' + result
 
         # Shodan lookup
         if lookup.shodan_key:

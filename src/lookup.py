@@ -112,10 +112,10 @@ def shodan(ip):
             logging.warning('Shodan lookup failed for ' + ip)
         
         except shodan_api.exception.APIError as e:
-            logging.warning(e)
             if e.value == u'Unable to connect to Shodan':
                 raise KeyboardInterrupt
                 # Other possible is 'No information available for that IP.' or 'Invalid API key'
+            logging.warning(e)
     else:
         logging.warning('No Shodan for ' + ip + ' as it doesn\'t seem to be an IP on the internet')
 
