@@ -45,14 +45,16 @@ class InstaRecon(object):
 
         # https://docs.python.org/2/library/logging.html#logging-levels
         logging_level = 40 #ERROR
+        log_format = '[-] %(levelname)s:%(message)s'
         if verbose == 1:
             logging_level = 30 #WARNING
         elif verbose == 2:
             logging_level = 20 #INFO
         elif verbose > 2:
             logging_level = 10 #DEBUG
+            log_format = '[-] %(levelname)s:%(module)s:%(funcName)s:%(lineno)d:%(message)s'
 
-        logging.basicConfig(format='[-] %(levelname)s: %(message)s', level=logging_level)
+        logging.basicConfig(format=log_format, level=logging_level)
 
     def populate(self, user_supplied_list):
         for user_supplied in user_supplied_list:

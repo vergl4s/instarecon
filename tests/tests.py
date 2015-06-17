@@ -23,6 +23,7 @@ class CHostTestCase(unittest.TestCase):
             'seek.com.au',
             'google.cn',
             'sucuri.net',
+            'twitter.com',
         ]
 
         cls.host = Host(random.choice(possible_hosts))
