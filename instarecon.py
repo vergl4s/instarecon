@@ -12,7 +12,6 @@ from src.ip import IP
 from src.host import Host
 from src.network import Network
 from src import lookup
-from src import log
 
 class InstaRecon(object):
     """

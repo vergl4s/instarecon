@@ -20,8 +20,6 @@ import pythonwhois as whois  # http://cryto.net/pythonwhois/usage.html https://g
 import requests
 import shodan  as shodan_api# https://shodan.readthedocs.org/en/latest/index.html
 
-import log
-
 dns_resolver = dns.resolver.Resolver()
 dns_resolver.timeout = 2
 dns_resolver.lifetime = 2

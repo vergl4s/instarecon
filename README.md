@@ -39,7 +39,7 @@ pip install pythonwhois ipwhois ipaddress shodan
 $ ./instarecon.py -v -s <shodan_key> -o ~/github.com.csv github.com 
 # InstaRecon v0.1.0 - by Luis Teixeira (teix.co)
 # Scanning 1/1 hosts
-# Shodan key provided - lIfnmamhMngr61fd5DkW0a82RyyMQzY3
+# Shodan key provided - <shodan_key>
 
 # ____________________ Scanning github.com ____________________ #
 
