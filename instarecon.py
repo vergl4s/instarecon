@@ -44,14 +44,14 @@ class InstaRecon(object):
             lookup.shodan_key = shodan_key
 
         # https://docs.python.org/2/library/logging.html#logging-levels
-        logging_level = 40 #ERROR
+        logging_level = 40 # ERROR
         log_format = '[-] %(levelname)s:%(message)s'
         if verbose == 1:
-            logging_level = 30 #WARNING
+            logging_level = 30 # WARNING
         elif verbose == 2:
-            logging_level = 20 #INFO
+            logging_level = 20 # INFO
         elif verbose > 2:
-            logging_level = 10 #DEBUG
+            logging_level = 10 # DEBUG
             log_format = '[-] %(levelname)s:%(module)s:%(funcName)s:%(lineno)d:%(message)s'
 
         logging.basicConfig(format=log_format, level=logging_level)

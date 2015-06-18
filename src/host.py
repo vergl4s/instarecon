@@ -210,7 +210,7 @@ class Host(object):
 
         for sub_str, google_results in subdomains.iteritems():
                 if sub_str == self.domain:
-                    self.urls = google_results.urls
+                    self.urls = sorted(google_results.urls)
                 else:
                     try:
                         sub = Host(domain=sub_str).lookup_dns()
@@ -387,14 +387,20 @@ class Host(object):
         if self.subdomains:
             yield ['\n']
             yield ['Subdomains for ' + str(self.domain)]
-            yield ['Domain', 'IP', 'Reverse domains']
+            yield ['Domain', 'IP', 'Reverse domains', 'URLs']
 
             for sub in sorted(self.subdomains, key=lambda x: x.domain):
                 for ip in sub.ips:
+                    line = []
                     if sub.domain:
-                        yield [sub.domain, ip.ip, ','.join(ip.rev_domains)]
+                        line.append(sub.domain)
                     else:
-                        yield [ip.rev_domains[0], ip.ip, ','.join(ip.rev_domains)]
+                        line.append('')
+                    line += [ip.ip, ','.join(ip.rev_domains)]
+                    if sub.urls:
+                        line += [sub.print_all_urls()]
+                    yield line
+
 
         if self.related_hosts:
             yield ['\n']
@@ -406,4 +412,3 @@ class Host(object):
                     ','.join([str(ip) for ip in sub.ips]),
                     ','.join([','.join(ip.rev_domains) for ip in sub.ips]),
                 ]
-
