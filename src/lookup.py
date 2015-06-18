@@ -200,7 +200,7 @@ def google_subdomains(name):
 
     logging.debug('Finished google lookups with '+str(len(google_results))+' subdomains discovered.')
 
-    return sorted(google_results)
+    return google_results
 
 def _update_google_results(new_google_results, results_dictionary):
     """Internal generator that manages multiple _google_subdomain_lookup"""

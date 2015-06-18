@@ -3,19 +3,19 @@ import itertools
 import logging
 import os
 import random
+import sys
 import unittest
 
 import ipaddress
 
 from instarecon import *
-from src import lookup
+lookup.shodan_key = os.getenv('SHODAN_KEY')
 
 class CHostTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
         
-
         possible_hosts = [
             'google.com',
             'amazon.com',
@@ -104,11 +104,11 @@ class AIPTestCase(unittest.TestCase):
         """
         cidrs = [
             ipa.ip_network(u'54.192.0.0/12'),
-            ipa.ip_network(u'54.206.0.0/16'), #overlaps and is smaller than '54.192.0.0/12'
+            ipa.ip_network(u'54.206.0.0/16'), # overlaps and is smaller than '54.192.0.0/12'
             ipa.ip_network(u'54.80.0.0/12'),
             ipa.ip_network(u'54.72.0.0/13'),
             ipa.ip_network(u'8.8.8.0/24'),
-            ipa.ip_network(u'8.8.8.128/25'), #overlaps and is smaller than '8.8.8.0/24'
+            ipa.ip_network(u'8.8.8.128/25'), # overlaps and is smaller than '8.8.8.0/24'
         ]
         self.assertEquals(len(IP._remove_overlaping_cidrs(cidrs)),4)
 
@@ -128,6 +128,4 @@ class BNetworkTestCase(unittest.TestCase):
         self.assertTrue(self.network.related_hosts)
 
 if __name__ == '__main__':
-    logging.basicConfig(level=40)
-    lookup.shodan_key = os.getenv('SHODAN_KEY')
     unittest.main()
