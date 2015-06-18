@@ -151,26 +151,29 @@ class Host(object):
         IP Whois lookups on each ip within self.ips
         Saved in each ip.whois_ip as dict, since this is how it is returned by ipwhois library.
         """
-        # Keeps track of lookups already made - cidr as key, whois_ip dict as val
-        cidrs_found = {}
-        for ip in self.ips:
+        for ip1 in self.ips:
             cidr_found = False
-            for cidr, whois_ip in cidrs_found.iteritems():
-                if ipa.ip_address(unicode(ip.ip)) in cidr:  # cidr already IPv4.Network obj
-                    # If cidr is already in Host, we won't call whois_ip again.
-                    # Note cidr already found is not saved in new ips, as it isn't really necessary
-                    ip.whois_ip = whois_ip
-                    cidr_found = True
-                    logging.info('Results for ' + str(ip) + ' already found in cidr ' + str(cidr))
+            
+            for ip2 in self.ips:
+                if cidr_found:
                     break
+                if ip1!=ip2:
+                    for cidr in ip2.cidrs:
+                        if ipa.ip_address(unicode(ip1.ip)) in cidr:  # cidr already IPv4.Network obj
+                            # If cidr is already in Host, we won't call whois_ip again.
+                            # Note cidr already found is not saved in new ips, as it isn't really necessary
+                            ip1.whois_ip = ip2.whois_ip
+                            ip1.cidrs = ip2.cidrs
+                            cidr_found = True
+                            logging.info('Results for ' + str(ip1) + ' already found in ip ' + str(ip2) + '. CIDR is ' + str(cidr))
+                            break
                 
             if not cidr_found:
-                logging.debug('Performing Whois IP lookup for ' + str(ip))
-                ip.lookup_whois_ip()
-                for cidr in ip.cidrs:
-                    cidrs_found[cidr] = ip.whois_ip
+                logging.debug('Performing Whois IP lookup for ' + str(ip1))
+                ip1.lookup_whois_ip()
 
-        self.cidrs = set([cidr for cidr in cidrs_found])
+        for ip in self.ips:
+            [self.cidrs.add(cidr) for cidr in ip.cidrs]
         return self
 
     def lookup_shodan_all(self):
@@ -366,7 +369,7 @@ class Host(object):
                 'IP whois',
                 'Shodan',
                 'LinkedIn page',
-                'CIDRs'
+                'CIDRs',
             ]
 
             for ip in self.ips:
@@ -381,7 +384,7 @@ class Host(object):
                     ip.print_whois_ip(),
                     ip.print_shodan(),
                     self.linkedin_page,
-                    ', '.join([str(cidr) for cidr in self.cidrs])
+                    ', '.join([str(cidr) for cidr in ip.cidrs])
                 ]
 
         if self.subdomains:
@@ -404,11 +407,11 @@ class Host(object):
 
         if self.related_hosts:
             yield ['\n']
-            yield ['Hosts in same CIDR as', str(self), '(all results found, including subdomains)']
+            yield ['Hosts in same CIDR as ' + str(self) + ' (' + ', '.join([str(cidr) for cidr in self.cidrs]) + ')']
             yield ['IP', 'Reverse domains']
 
-            for sub in sorted(self.related_hosts, key=lambda x: x.ips[0]):
+            for host in sorted(self.related_hosts, key=lambda x: x.ips[0]):
                 yield [
-                    ','.join([str(ip) for ip in sub.ips]),
-                    ','.join([','.join(ip.rev_domains) for ip in sub.ips]),
+                    ','.join([str(ip) for ip in host.ips]),
+                    ','.join([','.join(ip.rev_domains) for ip in host.ips]),
                 ]

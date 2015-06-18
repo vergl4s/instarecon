@@ -26,6 +26,7 @@ dns_resolver = dns.resolver.Resolver()
 dns_resolver.timeout = 2
 dns_resolver.lifetime = 2
 dns_maximum_retries = 3
+# dns.resolver.NoNameservers isnt handled here. It means there is no server available to answer query
 dns_exceptions = (
     dns.resolver.NoAnswer,
     dns.resolver.NXDOMAIN,

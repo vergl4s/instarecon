@@ -3,9 +3,10 @@ InstaRecon
 
 Automated basic digital reconnaissance. Great for getting an initial footprint of your targets and discovering additional subdomains. InstaRecon will do:
 
-* DNS (direct, PTR, MX, NS) recursively on all hosts discovered
-* Whois (domains and IP) lookups
-* Google dorks searching of subdomains and URLs
+* DNS lookups (A, PTR, MX, NS) 
+* DNS lookups recursively on all hosts discovered
+* Whois (on domain and IP) lookups
+* Google dorks looking for subdomains and URLs
 * [Shodan](https://www.shodan.io/) lookups
 * Reverse DNS lookups on entire CIDRs
 

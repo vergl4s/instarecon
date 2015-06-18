@@ -267,12 +267,13 @@ if __name__ == '__main__':
         usage='%(prog)s [options] target1 [target2 ... targetN]',
         epilog=argparse.SUPPRESS,
     )
-    parser.add_argument('targets', nargs='+', help='targets to be scanned - can be in the format of a domain (google.com), an IP (8.8.8.8) or a network range (8.8.8.0/24)')
+
+    parser.add_argument('targets', nargs='+', help='targets to be scanned - can be a domain (google.com), an IP (8.8.8.8) or a network range (8.8.8.0/24)')
     parser.add_argument('-o', '--output', required=False, nargs='?', help='output filename as csv')
     parser.add_argument('-n', '--nameserver', required=False, nargs='?', help='alternative DNS server to query')
-    parser.add_argument('-s', '--shodan_key', required=False, nargs='?', help='shodan key for automated port/service information')
+    parser.add_argument('-s', '--shodan_key', required=False, nargs='?', help='shodan key for automated port/service information (SHODAN_KEY environment variable also works for this')
     parser.add_argument('-t', '--timeout', required=False, nargs='?', type=float, help='timeout for DNS lookups (default is 2s)')
-    parser.add_argument('-v', '--verbose', action='count', default=0, help='verbose errors (-vv for warnings)')
+    parser.add_argument('-v', '--verbose', action='count', default=0, help='verbose errors (-vv or -vvv for extra verbosity)')
     parser.add_argument('-d', '--dns_only', action='store_true', help='direct and reverse DNS lookups only')
 
     args = parser.parse_args()
