@@ -30,7 +30,7 @@ class Host(object):
     cidrs -- set of ipa.IPv4Network objects related to each ip.cidrs
     """
 
-    def __init__(self, domain=None, ips=(), reverse_domains=()):
+    def __init__(self, domain=None, ips=(), reverse_domains=(), strict=False):
         self.domain = None
         self.ips = []
 
@@ -41,8 +41,8 @@ class Host(object):
             self.domain = domain
             self._get_ips()
 
-            # Check if domain can be resolved
-            if not self.ips:
+            # Check if domain can be resolved only if strict flag is True
+            if strict and not self.ips:
                 # Couldn't resolve domain
                 raise ValueError
 

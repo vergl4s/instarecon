@@ -65,9 +65,6 @@ def dns_lookup_manager(target, lookup_type):
 
         except dns_exceptions as e:
             message = lookup_type + ' lookup failed for ' + target + ' - ' + str(e.__class__.__name__)
-            # if lookup_type == 'PTR':
-            #     logging.info(message)
-            # else:
             logging.warning(message)
 
             # Needs to be here, as otherwise while will continue trying to scan the same host
