@@ -7,7 +7,7 @@ Raises lookup.NoInternetAccess.
 
 """
 import logging
-from random import randint
+from random import randint, choice
 import re
 import socket
 import time
@@ -24,28 +24,27 @@ dns_resolver = dns.resolver.Resolver()
 dns_resolver.timeout = 2
 dns_resolver.lifetime = 2
 dns_maximum_retries = 3
-# dns.resolver.NoNameservers isnt handled here. It means there is no server available to answer query
 dns_exceptions = (
     dns.resolver.NoAnswer,
     dns.resolver.NXDOMAIN,
     dns.resolver.YXDOMAIN,
     dns.exception.SyntaxError,
+    dns.resolver.NoNameservers
 )
-dns_timeout = (dns.exception.Timeout)
 
 shodan_key = None
 
 def direct_dns(name):
-    return dns_lookup_manager(name,'A')
+    return dns_lookup_manager(name,'A') or None
 
 def reverse_dns(ip):
-    return dns_lookup_manager(ip,'PTR')
+    return dns_lookup_manager(ip,'PTR') or None
 
 def mx_dns(name):
-    return [str(mx.exchange).rstrip('.') for mx in dns_lookup_manager(name,'MX')]
+    return [str(mx.exchange).rstrip('.') for mx in dns_lookup_manager(name,'MX')] or None
 
 def ns_dns(name):
-    return [str(ns).rstrip('.') for ns in dns_lookup_manager(name,'NS')]
+    return [str(ns).rstrip('.') for ns in dns_lookup_manager(name,'NS')] or None
 
 def dns_lookup_manager(target, lookup_type):
     tries=0
@@ -65,19 +64,24 @@ def dns_lookup_manager(target, lookup_type):
                 return dns_resolver.query(target, 'NS')
 
         except dns_exceptions as e:
-            if lookup_type == 'PTR':
-                logging.info(lookup_type + ' lookup failed for ' + target)
-            else:
-                logging.warning(lookup_type + ' lookup failed for ' + target)
+            message = lookup_type + ' lookup failed for ' + target + ' - ' + str(e.__class__.__name__)
+            # if lookup_type == 'PTR':
+            #     logging.info(message)
+            # else:
+            logging.warning(message)
+
+            # Needs to be here, as otherwise while will continue trying to scan the same host
             return ()
 
-        except dns_timeout as e:
+        except dns.exception.Timeout as e:
             tries += 1
             if tries < dns_maximum_retries:
-                logging.warning('Timeout resolving ' + target + '. Retrying.')
+                logging.info('Timeout resolving ' + target + '. Retrying.')
             else:
-                logging.warning(str(dns_maximum_retries)+ ' timeouts trying to resolve ' + target + '. Giving up.')
-                raise NoInternetAccess
+                logging.info(str(dns_maximum_retries)+ ' timeouts resolving ' + target + '. Internet connection alright?')
+                test_internet_connection() # will raise NoInternetAccess if failed
+                logging.warning(lookup_type + ' lookup failed for ' + target + ' - ' + str(e.__class__.__name__))
+                return()
 
 def whois_domain(name):
     try:
@@ -281,6 +285,28 @@ class GoogleDomainResult(object):
     def add_url(self, g_protocol, g_pathname):
         self.urls.setdefault(g_protocol, set()).add(g_pathname)
         self.count += 1
+
+def test_internet_connection():
+    '''
+    Reaches out to public well known DNS servers to check if machine has internet access.
+    This exists because sometimes you might get arbitraty timeouts as replies but have internet connection.
+
+    Raises NoInternetAccess if the test fails.
+    '''
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(2)
+    possible_targets = [
+        '8.8.8.8',
+        '8.8.4.4',
+        '139.130.4.5',
+    ]
+    try:
+        target = choice(possible_targets)
+        logging.info('Testing internet connection by trying to reach out to host ' + target)
+        s.connect((target,53))
+        s.close()
+    except (socket.timeout, socket.error, socket.gaierror) as e:
+        raise NoInternetAccess
 
 class NoInternetAccess(Exception):
     pass
