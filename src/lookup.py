@@ -14,11 +14,11 @@ import time
 
 import dns.resolver
 import dns.reversename
-import ipaddress as ipa  # https://docs.python.org/3/library/ipaddress.html
-import ipwhois as ipw  # https://pypi.python.org/pypi/ipwhois
-import pythonwhois as whois  # http://cryto.net/pythonwhois/usage.html https://github.com/joepie91/python-whois
+import ipaddress as ipa # https://docs.python.org/3/library/ipaddress.html
+import ipwhois as ipw # https://pypi.python.org/pypi/ipwhois
+import pythonwhois as whois # http://cryto.net/pythonwhois/usage.html https://github.com/joepie91/python-whois
 import requests
-import shodan  as shodan_api# https://shodan.readthedocs.org/en/latest/index.html
+import shodan  as shodan_api # https://shodan.readthedocs.org/en/latest/index.html
 
 dns_resolver = dns.resolver.Resolver()
 dns_resolver.timeout = 2
@@ -37,8 +37,8 @@ shodan_key = None
 def direct_dns(name):
     return dns_lookup_manager(name,'A') or None
 
-def reverse_dns(ip):
-    return dns_lookup_manager(ip,'PTR') or None
+def reverse_dns(ip, suppress_warning=False):
+    return dns_lookup_manager(ip, 'PTR', suppress_warning) or None
 
 def mx_dns(name):
     return [str(mx.exchange).rstrip('.') for mx in dns_lookup_manager(name,'MX')] or None
@@ -46,7 +46,7 @@ def mx_dns(name):
 def ns_dns(name):
     return [str(ns).rstrip('.') for ns in dns_lookup_manager(name,'NS')] or None
 
-def dns_lookup_manager(target, lookup_type):
+def dns_lookup_manager(target, lookup_type, suppress_warning=False):
     tries=0
     while tries < dns_maximum_retries:
         try:
@@ -65,7 +65,10 @@ def dns_lookup_manager(target, lookup_type):
 
         except dns_exceptions as e:
             message = lookup_type + ' lookup failed for ' + target + ' - ' + str(e.__class__.__name__)
-            logging.warning(message)
+            if not suppress_warning:
+                logging.warning(message)
+            else:
+                logging.info(message)
 
             # Needs to be here, as otherwise while will continue trying to scan the same host
             return ()
@@ -76,7 +79,7 @@ def dns_lookup_manager(target, lookup_type):
                 logging.info('Timeout resolving ' + target + '. Retrying.')
             else:
                 logging.info(str(dns_maximum_retries)+ ' timeouts resolving ' + target + '. Internet connection alright?')
-                test_internet_connection() # will raise NoInternetAccess if failed
+                test_internet_connection()
                 logging.warning(lookup_type + ' lookup failed for ' + target + ' - ' + str(e.__class__.__name__))
                 return()
 
@@ -142,7 +145,7 @@ def rev_dns_on_cidr(cidr):
         for ip in cidr:
             lookup_result = None
 
-            lookup_result = reverse_dns(str(ip))
+            lookup_result = reverse_dns(str(ip), suppress_warning=True)
             if lookup_result:
                 reverse_domains = [str(domain).rstrip('.') for domain in lookup_result]
                 yield ip, reverse_domains
@@ -157,14 +160,14 @@ def google_linkedin_page(name):
     
     try:
         google_search = requests.get(request)
+        google_results = re.findall('<cite>(.+?)<\/cite>', google_search.text)
+        for url in google_results:
+            if 'linkedin.com/company/' in url:
+                return re.sub('<.*?>', '', url)
+
     except requests.ConnectionError as e:
         logging.warning(e)
-        raise NoInternetAccess
-    
-    google_results = re.findall('<cite>(.+?)<\/cite>', google_search.text)
-    for url in google_results:
-        if 'linkedin.com/company/' in url:
-            return re.sub('<.*?>', '', url)
+        test_internet_connection()
 
 def google_subdomains(name):
     """
@@ -229,6 +232,13 @@ def _update_google_results(new_google_results, results_dictionary):
             g_pathname = ''.join(['/', '/'.join(temp[1:])])
             g_host = temp[0]
 
+        # if there is a port specified
+        temp = g_host.split(':')
+        if len(temp) > 1:
+            g_host = temp[0]
+            g_pathname = ''.join([':', temp[1], g_pathname])
+            logging.debug('Found host ' + g_host + ' with port ' + temp[1] + '. New pathname is ' + g_pathname)
+
         results_dictionary.setdefault(g_host, GoogleDomainResult()).add_url(g_protocol, g_pathname)
 
     return results_dictionary
@@ -264,7 +274,7 @@ def _google_subdomain_lookup(domain, subs_to_avoid=(), num=100, counter=0):
         
     except requests.ConnectionError as e:
         logging.warning(e)
-        raise NoInternetAccess
+        test_internet_connection()
 
 class GoogleDomainResult(object):
     """

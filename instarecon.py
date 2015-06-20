@@ -5,7 +5,7 @@ import logging
 import os
 import sys
 
-import ipaddress as ipa  # https://docs.python.org/3/library/ipaddress.html
+import ipaddress as ipa # https://docs.python.org/3/library/ipaddress.html
 import dns.resolver
 
 from src.ip import IP
@@ -88,9 +88,9 @@ class InstaRecon(object):
         except ValueError as e:
             pass
 
-        # Test if user_supplied is a valid DNS?
+        # Test if user_supplied is a valid DNS? Needs strict flag, otherwise no ValueError will be raise by Host
         try:
-            self.targets.add(Host(domain=user_supplied))
+            self.targets.add(Host(domain=user_supplied, strict=True))
             return
         except ValueError as e:
             logging.critical('Couldn\'t resolve or understand ' + user_supplied)
@@ -301,7 +301,7 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         logging.error('Scan interrupted')
 
-    except (lookup.NoInternetAccess):
+    except lookup.NoInternetAccess:
         logging.critical('Something went wrong. Sure you got internet connection?')
         sys.exit()
 
