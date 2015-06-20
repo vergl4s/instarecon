@@ -24,7 +24,7 @@ class InstaRecon(object):
     versobe -- Bool flag for verbose output printing. Passed to logs.
     shodan_key -- Str key used for Shodan lookups. Passed to lookups.
     """
-    __version__ = '0.1.0'
+    __version__ = '0.1.1'
     entry_banner = '# InstaRecon v' + __version__ + ' - by Luis Teixeira (teix.co)'
     exit_banner = '# Done'
 
