@@ -29,7 +29,7 @@ class InstaRecon(object):
     exit_banner = '# Done'
 
     def __init__(self, nameserver=None, timeout=None, shodan_key=None, verbose=0, dns_only=False):
-        
+
         self.dns_only = dns_only
         self.targets = set()
         self.bad_targets = set()
@@ -44,14 +44,14 @@ class InstaRecon(object):
 
         # https://docs.python.org/2/library/logging.html#logging-levels
         logging_level = 40 # ERROR
-        log_format = '[-] %(levelname)s:%(message)s'
+        log_format = '[-] %(levelname)s: %(message)s'
         if verbose == 1:
             logging_level = 30 # WARNING
         elif verbose == 2:
             logging_level = 20 # INFO
         elif verbose > 2:
             logging_level = 10 # DEBUG
-            log_format = '[-] %(levelname)s:%(module)s:%(funcName)s:%(lineno)d:%(message)s'
+            log_format = '[-] %(levelname)s:%(module)s:%(funcName)s:%(lineno)d: %(message)s'
 
         logging.basicConfig(format=log_format, level=logging_level)
 
@@ -79,20 +79,20 @@ class InstaRecon(object):
         try:
             self.targets.add(Host(ips=[user_supplied]))
             return
-        except ValueError as e:
+        except ValueError:
             pass
 
         try:
             self.targets.add(Network(user_supplied))
             return
-        except ValueError as e:
+        except ValueError:
             pass
 
         # Test if user_supplied is a valid DNS? Needs strict flag, otherwise no ValueError will be raise by Host
         try:
             self.targets.add(Host(domain=user_supplied, strict=True))
             return
-        except ValueError as e:
+        except ValueError:
             logging.critical('Couldn\'t resolve or understand ' + user_supplied)
             pass
 
@@ -113,11 +113,9 @@ class InstaRecon(object):
 
         print ''
         print '# ____________________ Scanning {} ____________________ #'.format(str(host))
+        print ''
 
         # DNS and Whois lookups
-        print ''
-        print '# DNS lookups'
-
         host.lookup_dns()
         if host.domain:
             print '[*] Domain: ' + host.domain
@@ -142,15 +140,14 @@ class InstaRecon(object):
             print '[*] MX records:'
             print host.print_all_mx()
 
-        print ''
-        print '# Whois lookups'
-
+        # Domain whois
         host.lookup_whois_domain()
         if host.whois_domain:
             print ''
             print '[*] Whois domain:'
             print host.whois_domain
 
+        # IP whois
         host.lookup_whois_ip_all()
         m = host.print_all_whois_ip()
         if m:
@@ -158,7 +155,12 @@ class InstaRecon(object):
                 print ''
                 print '[*] Whois IP for ' + result
 
-        # Shodan lookup
+        # CIDRs
+        if host.cidrs:
+            print ''
+            print '[*] Related CIDR:\n{}'.format(host.print_all_cidrs())
+
+        # Shodan
         if lookup.shodan_key:
 
             print ''
@@ -186,12 +188,6 @@ class InstaRecon(object):
             else:
                 logging.error('No subdomains found in Google. If you are scanning a lot, Google might be blocking your requests.')
 
-        # DNS lookups on entire CIDRs taken from host.lookup_whois_ip_all()
-        if host.cidrs:
-            print ''
-            print '# Reverse DNS lookup on range {}'.format(', '.join([str(cidr) for cidr in host.cidrs]))
-            self.reverse_dns_on_cidr(host)
-    
     def scan_host_dns_only(self, host):
         """Does only direct and reverse DNS lookups for host"""
 
@@ -212,21 +208,16 @@ class InstaRecon(object):
     @staticmethod
     def reverse_dns_on_cidr(target):
         """Does reverse dns lookups on a target, and saves results to target using target.add_related_host"""
-        cidrs = set()
-        if isinstance(target, Host):
-            [cidrs.add(cidr) for cidr in target.cidrs]
-        elif isinstance(target, Network):
-            cidrs.add(target.cidr)
-        else:
+        if not isinstance(target, Network):
             raise ValueError
 
-        for cidr in cidrs:
+        cidr = target.cidr
 
-            for ip, reverse_domains in lookup.rev_dns_on_cidr(cidr):
+        for ip, reverse_domains in lookup.rev_dns_on_cidr(cidr):
 
-                    new_host = Host(ips=[ip], reverse_domains=reverse_domains)
-                    target.add_related_host(new_host)
-                    print new_host.print_all_ips()
+                new_host = Host(ips=[ip], reverse_domains=reverse_domains)
+                target.add_related_host(new_host)
+                print new_host.print_all_ips()
 
         if not target.related_hosts:
             print '# No results for this range'
@@ -299,7 +290,7 @@ if __name__ == '__main__':
         scan.scan_targets()
 
     except KeyboardInterrupt:
-        logging.error('Scan interrupted')
+        logging.warning('Scan interrupted')
 
     except lookup.NoInternetAccess:
         logging.critical('Something went wrong. Sure you got internet connection?')

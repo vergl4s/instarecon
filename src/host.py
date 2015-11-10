@@ -153,7 +153,7 @@ class Host(object):
         """
         for ip1 in self.ips:
             cidr_found = False
-            
+
             for ip2 in self.ips:
                 if cidr_found:
                     break
@@ -167,7 +167,7 @@ class Host(object):
                             cidr_found = True
                             logging.info('Results for ' + str(ip1) + ' already found in ip ' + str(ip2) + '. CIDR is ' + str(cidr))
                             break
-                
+
             if not cidr_found:
                 logging.debug('Performing Whois IP lookup for ' + str(ip1))
                 ip1.lookup_whois_ip()
@@ -296,7 +296,7 @@ class Host(object):
                 ips = host.print_all_ips()
                 if ips:
                     ret = ''.join([ret, '\n\t', ips.replace('\n', '\n\t')])
-                
+
                 urls = host.print_all_urls()
                 if urls:
                     ret = ''.join([ret, '\n\t', urls.replace('\n','\n\t')])
@@ -304,10 +304,14 @@ class Host(object):
                 ret = ''.join([ret, '\n'])
 
             return ret.rstrip().lstrip()
-    
+
     def print_all_ips(self):
         if self.ips:
             return '\n'.join([ip.print_ip() for ip in self.ips]).rstrip()
+
+    def print_all_cidrs(self):
+        if self.cidrs:
+            return '\n'.join([str(cidr) for cidr in self.cidrs])
 
     def print_all_urls(self):
         if self.urls:
