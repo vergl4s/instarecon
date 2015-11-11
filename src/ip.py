@@ -149,7 +149,9 @@ class IP(object):
         if self.shodan:
 
             result = ''.join(['IP: ', self.shodan.get('ip_str'), '\n'])
-            result = ''.join([result, 'Organization: ', self.shodan.get('org', 'n/a'), '\n'])
+
+            if self.shodan.get('org', 'n/a'):
+                result = ''.join([result, 'Organization: ', self.shodan.get('org', 'n/a'), '\n'])
 
             if self.shodan.get('os', 'n/a'):
                 result = ''.join([result, 'OS: ', self.shodan.get('os', 'n/a'), '\n'])

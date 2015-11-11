@@ -28,9 +28,10 @@ class InstaRecon(object):
     entry_banner = '# InstaRecon v' + __version__ + ' - by Luis Teixeira (teix.co)'
     exit_banner = '# Done'
 
-    def __init__(self, nameserver=None, timeout=None, shodan_key=None, verbose=0, dns_only=False):
+    def __init__(self, scan_flags, nameserver=None, timeout=None,
+                shodan_key=None, verbose=0):
 
-        self.dns_only = dns_only
+        self.scan_flags = scan_flags
         self.targets = set()
         self.bad_targets = set()
 
@@ -64,11 +65,8 @@ class InstaRecon(object):
         else:
             print '# Scanning', str(len(self.targets)) + '/' + str(len(user_supplied_list)), 'hosts'
 
-            if not self.dns_only:
-                if not lookup.shodan_key:
-                    print '# No Shodan key provided'
-                else:
-                    print'# Shodan key provided -', lookup.shodan_key
+            if not lookup.shodan_key:
+                print '# No Shodan key provided'
 
     def add_host(self, user_supplied):
         """
@@ -100,21 +98,28 @@ class InstaRecon(object):
 
     def scan_targets(self):
         for target in self.targets:
-            if type(target) is Host:
-                if self.dns_only:
-                    self.scan_host_dns_only(target)
-                else:
-                    self.scan_host(target)
-            elif type(target) is Network:
+            if isinstance(target, Host):
+                self.scan_host(target)
+            elif isinstance(target, Network):
                 self.scan_network(target)
 
     def scan_host(self, host):
-        """Does all possible scans for host"""
-
         print ''
         print '# ____________________ Scanning {} ____________________ #'.format(str(host))
         print ''
 
+        flags_default = not (args.dns or args.whois or args.shodan or args.google)
+
+        if self.scan_flags['dns'] or flags_default:
+            self.scan_host_dns(host)
+        if self.scan_flags['whois'] or flags_default:
+            self.scan_host_whois(host)
+        if self.scan_flags['shodan'] or flags_default:
+            self.scan_host_shodan(host)
+        if self.scan_flags['google'] or flags_default:
+            self.scan_host_google(host)
+
+    def scan_host_dns(self, host):
         # DNS and Whois lookups
         host.lookup_dns()
         if host.domain:
@@ -123,7 +128,7 @@ class InstaRecon(object):
         # IPs and reverse domains
         if host.ips:
             print ''
-            print '[*] IPs & reverse DNS: '
+            print '[*] IPs & reverse DNS:'
             print host.print_all_ips()
 
         host.lookup_dns_ns()
@@ -139,11 +144,13 @@ class InstaRecon(object):
             print ''
             print '[*] MX records:'
             print host.print_all_mx()
+        print ''
 
+
+    def scan_host_whois(self, host):
         # Domain whois
         host.lookup_whois_domain()
         if host.whois_domain:
-            print ''
             print '[*] Whois domain:'
             print host.whois_domain
 
@@ -160,10 +167,12 @@ class InstaRecon(object):
             print ''
             print '[*] Related CIDR:\n{}'.format(host.print_all_cidrs())
 
+        print ''
+
+    def scan_host_shodan(self, host):
         # Shodan
         if lookup.shodan_key:
 
-            print ''
             print '# Querying Shodan for open ports'
 
             host.lookup_shodan_all()
@@ -172,10 +181,16 @@ class InstaRecon(object):
             if m:
                 print '[*] Shodan:'
                 print m
+            else:
+                logging.error('No Shodan entries found')
 
+        else:
+            print "# Can't do Shodan lookups without a key"
+        print ''
+
+    def scan_host_google(self, host):
         # Google subdomains lookup
         if host.domain:
-            print ''
             print '# Querying Google for subdomains and Linkedin pages, this might take a while'
 
             host.google_lookups()
@@ -187,17 +202,7 @@ class InstaRecon(object):
                 print '[*] Subdomains:' + '\n' + host.print_google_subdomains()
             else:
                 logging.error('No subdomains found in Google. If you are scanning a lot, Google might be blocking your requests.')
-
-    def scan_host_dns_only(self, host):
-        """Does only direct and reverse DNS lookups for host"""
-
-        print ''
-        print '# _________________ DNS lookups on {} _________________ #'.format(str(host))
-
-        host.lookup_dns()
-        if host.domain:
             print ''
-            print host.print_dns_only()
 
     def scan_network(self, network):
         """Scan a network object"""
@@ -264,7 +269,10 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--shodan_key', required=False, nargs='?', help='shodan key for automated port/service information (SHODAN_KEY environment variable also works for this')
     parser.add_argument('-t', '--timeout', required=False, nargs='?', type=float, help='timeout for DNS lookups (default is 2s)')
     parser.add_argument('-v', '--verbose', action='count', default=0, help='verbose errors (-vv or -vvv for extra verbosity)')
-    parser.add_argument('-d', '--dns_only', action='store_true', help='direct and reverse DNS lookups only')
+    parser.add_argument('--dns', action='store_true', help='DNS lookups')
+    parser.add_argument('--whois', action='store_true', help='whois lookups')
+    parser.add_argument('--shodan', action='store_true', help='shodan lookups')
+    parser.add_argument('--google', action='store_true', help='google lookups')
 
     args = parser.parse_args()
 
@@ -275,12 +283,19 @@ if __name__ == '__main__':
     else:
         shodan_key = os.getenv('SHODAN_KEY')
 
+    scan_flags = {
+        'dns':args.dns,
+        'whois':args.whois,
+        'shodan':args.shodan,
+        'google':args.google,
+    }
+
     scan = InstaRecon(
+        scan_flags,
         nameserver=args.nameserver,
         shodan_key=shodan_key,
         timeout=args.timeout,
         verbose=args.verbose,
-        dns_only=args.dns_only,
     )
 
     try:
