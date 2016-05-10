@@ -129,17 +129,17 @@ class IP(object):
                 if net['country']:
                     result = '\n\t'.join([result, 'country' + ': ' + net['country'].replace('\n', ', ')])
                 result = '\n\t'.join([result, ''])
-                if net['abuse_emails']:
+                if 'abuse_emails' in net:
                     result = '\n\t'.join([result, 'abuse_emails' + ': ' + net['abuse_emails'].replace('\n', ', ')])
-                if net['tech_emails']:
+                if 'tech_emails' in net:
                     result = '\n\t'.join([result, 'tech_emails' + ': ' + net['tech_emails'].replace('\n', ', ')])
-                if net['misc_emails']:
+                if 'misc_emails' in net:
                     result = '\n\t'.join([result, 'misc_emails' + ': ' + net['misc_emails'].replace('\n', ', ')])
                 result = '\n\t'.join([result, ''])
-                if net['created']:
-                    result = '\n\t'.join([result, 'created' + ': ' + time.strftime("%Y-%m-%d %H:%M:%S", time.strptime(net['created'].replace('\n', ', '), '%Y-%m-%dT%H:%M:%S'))])
-                if net['updated']:
-                    result = '\n\t'.join([result, 'updated' + ': ' + time.strftime("%Y-%m-%d %H:%M:%S", time.strptime(net['updated'].replace('\n', ', '), '%Y-%m-%dT%H:%M:%S'))])
+                # if 'created' in net:
+                    # result = '\n\t'.join([result, 'created' + ': ' + time.strftime("%Y-%m-%d", time.strptime(net['created'].replace('\n', ', '), '%Y-%m-%d'))])
+                # if 'updated' in net:
+                    # result = '\n\t'.join([result, 'updated' + ': ' + time.strftime("%Y-%m-%d", time.strptime(net['updated'].replace('\n', ', '), '%Y-%m-%d'))])
 
                 # for key2,val2 in sorted(net.iteritems()):
                 #         result = '\n\t'.join([result,key2+': '+str(val2).replace('\n',', ')])

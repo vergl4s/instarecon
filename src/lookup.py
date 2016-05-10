@@ -95,7 +95,7 @@ def whois_domain(name):
 def whois_ip(ip):
     if ip_is_valid(ip):
         try:
-            return ipw.IPWhois(ip).lookup()
+            return ipw.IPWhois(ip).lookup_whois()
 
         except ipw.WhoisLookupError as e:
             raise KeyboardInterrupt

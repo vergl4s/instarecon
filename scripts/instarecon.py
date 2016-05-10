@@ -12,6 +12,7 @@ from src.ip import IP
 from src.host import Host
 from src.network import Network
 from src import lookup
+from src._version import __version__
 
 class InstaRecon(object):
     """
@@ -24,7 +25,6 @@ class InstaRecon(object):
     versobe -- Bool flag for verbose output printing. Passed to logs.
     shodan_key -- Str key used for Shodan lookups. Passed to lookups.
     """
-    __version__ = '0.1.1'
     entry_banner = '# InstaRecon v' + __version__ + ' - by Luis Teixeira (teix.co)'
     exit_banner = '# Done'
 

@@ -1,5 +1,8 @@
 *.pyc
+__pycache__
+build
+dist
+*.egg
+*.eggs
+*.egg-info
 *.log
-venv/*
-env/*
-tmp.py

@@ -6,16 +6,20 @@ import random
 import sys
 import unittest
 
-import ipaddress
+import ipaddress as ipa
 
-from instarecon import *
+from src.host import Host
+from src.ip import IP
+from src.network import Network
+import src.lookup as lookup
+
 lookup.shodan_key = os.getenv('SHODAN_KEY')
 
 class CHostTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        
+
         possible_hosts = [
             'google.com',
             'amazon.com',
@@ -42,7 +46,7 @@ class CHostTestCase(unittest.TestCase):
         self.assertIsInstance(self.host.google_subdomains, set)
         self.assertIsInstance(self.host.subdomains, set)
         self.assertIsInstance(self.host.cidrs, set)
-        [self.assertIsInstance(cidr, ipaddress.IPv4Network) for cidr in self.host.cidrs]
+        [self.assertIsInstance(cidr, ipa.IPv4Network) for cidr in self.host.cidrs]
         [self.assertIsInstance(host, Host) for host in self.host.subdomains]
         [self.assertIsInstance(host, Host) for host in self.host.google_subdomains]
         self.assertIsInstance(self.host.urls, dict)
@@ -86,7 +90,7 @@ class AIPTestCase(unittest.TestCase):
         self.assertIsInstance(self.host.ips[0].rev_domains, list)
         self.assertIsInstance(self.host.ips[0].whois_ip, dict)
         self.assertIsInstance(self.host.ips[0].cidrs, set)
-        [self.assertIsInstance(cidr, ipaddress.IPv4Network) for cidr in self.host.ips[0].cidrs]
+        [self.assertIsInstance(cidr, ipa.IPv4Network) for cidr in self.host.ips[0].cidrs]
         self.assertIsInstance(self.host.ips[0].shodan.get('ip_str'), unicode)
 
     def test_valid_results(self):
@@ -120,12 +124,12 @@ class BNetworkTestCase(unittest.TestCase):
         print '\n# Testing Network {}'.format(str(cls.network))
 
     def test_property_types(self):
-        self.assertIsInstance(self.network.cidr, ipaddress.IPv4Network)
+        self.assertIsInstance(self.network.cidr, ipa.IPv4Network)
         self.assertIsInstance(self.network.related_hosts, set)
 
-    def test_reverse_dns_lookup(self):
-        InstaRecon.reverse_dns_on_cidr(self.network)
-        self.assertTrue(self.network.related_hosts)
+    # def test_reverse_dns_lookup(self):
+    #     InstaRecon.reverse_dns_on_cidr(self.network)
+    #     self.assertTrue(self.network.related_hosts)
 
 if __name__ == '__main__':
     unittest.main()
