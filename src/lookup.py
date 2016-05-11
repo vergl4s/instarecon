@@ -34,6 +34,11 @@ dns_exceptions = (
 
 shodan_key = None
 
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36',
+}
+
+
 def direct_dns(name):
     return dns_lookup_manager(name,'A') or None
 

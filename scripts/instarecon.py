@@ -28,10 +28,9 @@ class InstaRecon(object):
     entry_banner = '# InstaRecon v' + __version__ + ' - by Luis Teixeira (teix.co)'
     exit_banner = '# Done'
 
-    def __init__(self, scan_flags, nameserver=None, timeout=None,
+    def __init__(self, nameserver=None, timeout=None,
                 shodan_key=None, verbose=0):
 
-        self.scan_flags = scan_flags
         self.targets = set()
         self.bad_targets = set()
 
@@ -88,7 +87,7 @@ class InstaRecon(object):
 
         # Test if user_supplied is a valid DNS? Needs strict flag, otherwise no ValueError will be raise by Host
         try:
-            self.targets.add(Host(domain=user_supplied, strict=True))
+            self.targets.add(Host(domain=user_supplied, strict=False))
             return
         except ValueError:
             logging.critical('Couldn\'t resolve or understand ' + user_supplied)
@@ -108,16 +107,21 @@ class InstaRecon(object):
         print '# ____________________ Scanning {} ____________________ #'.format(str(host))
         print ''
 
-        flags_default = not (args.dns or args.whois or args.shodan or args.google)
+        # flags_default = not (args.dns or args.whois or args.shodan or args.google)
 
-        if self.scan_flags['dns'] or flags_default:
-            self.scan_host_dns(host)
-        if self.scan_flags['whois'] or flags_default:
-            self.scan_host_whois(host)
-        if self.scan_flags['shodan'] or flags_default:
-            self.scan_host_shodan(host)
-        if self.scan_flags['google'] or flags_default:
-            self.scan_host_google(host)
+        # if self.scan_flags['dns'] or flags_default:
+        #     self.scan_host_dns(host)
+        # if self.scan_flags['whois'] or flags_default:
+        #     self.scan_host_whois(host)
+        # if self.scan_flags['shodan'] or flags_default:
+        #     self.scan_host_shodan(host)
+        # if self.scan_flags['google'] or flags_default:
+        #     self.scan_host_google(host)
+
+        self.scan_host_dns(host)
+        self.scan_host_whois(host)
+        self.scan_host_shodan(host)
+        self.scan_host_google(host)
 
     def scan_host_dns(self, host):
         # DNS and Whois lookups
@@ -269,10 +273,10 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--shodan_key', required=False, nargs='?', help='shodan key for automated port/service information (SHODAN_KEY environment variable also works for this')
     parser.add_argument('-t', '--timeout', required=False, nargs='?', type=float, help='timeout for DNS lookups (default is 2s)')
     parser.add_argument('-v', '--verbose', action='count', default=0, help='verbose errors (-vv or -vvv for extra verbosity)')
-    parser.add_argument('--dns', action='store_true', help='DNS lookups')
-    parser.add_argument('--whois', action='store_true', help='whois lookups')
-    parser.add_argument('--shodan', action='store_true', help='shodan lookups')
-    parser.add_argument('--google', action='store_true', help='google lookups')
+    # parser.add_argument('--dns', action='store_true', help='DNS lookups')
+    # parser.add_argument('--whois', action='store_true', help='whois lookups')
+    # parser.add_argument('--shodan', action='store_true', help='shodan lookups')
+    # parser.add_argument('--google', action='store_true', help='google lookups')
 
     args = parser.parse_args()
 
@@ -283,15 +287,14 @@ if __name__ == '__main__':
     else:
         shodan_key = os.getenv('SHODAN_KEY')
 
-    scan_flags = {
-        'dns':args.dns,
-        'whois':args.whois,
-        'shodan':args.shodan,
-        'google':args.google,
-    }
+    # scan_flags = {
+    #     'dns':args.dns,
+    #     'whois':args.whois,
+    #     'shodan':args.shodan,
+    #     'google':args.google,
+    # }
 
     scan = InstaRecon(
-        scan_flags,
         nameserver=args.nameserver,
         shodan_key=shodan_key,
         timeout=args.timeout,

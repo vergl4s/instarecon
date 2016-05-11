@@ -8,36 +8,39 @@ Automated basic digital reconnaissance. Great for getting an initial footprint o
 * Whois (on domain and IP) lookups
 * Google dorks looking for subdomains and URLs
 * [Shodan](https://www.shodan.io/) lookups
-* Reverse DNS lookups on entire CIDRs
+* Reverse DNS lookups on entire CIDRs (only if target is a network)
 
 ...all printed nicely on your console or csv file. 
 
 InstaRecon will never scan a target directly. Information is retrieved from DNS/Whois servers, Google, and [Shodan](https://www.shodan.io/).
 
-###Installing with pip
-Simply install dependencies using pip. Tested on Ubuntu 14.04 and Kali Linux 1.1.0a.
+### Installing
 
+To install simply do:
 ```bash
-pip install -r requirements.txt
-```
-or
-```bash
-pip install pythonwhois ipwhois ipaddress shodan
+./setup.py install
 ```
 
-###TODO
+Dependencies should be automatically installed. Then go:
+
+```bash 
+instarecon.py <target>
+```
+Tested on Ubuntu 14.04 and Kali-Rolling (2016.1).
+
+### TODO
 * Shodan robots.txt
 * Improve output files - use xlsx instead of csv, as width can be controlled.
 * Improve Google crawler performance, implement random headers and user-agents.
 * Scan threading.
 * LinkedIn page scraping. Possibly other sources?
-* Pip installable? (https://packaging.python.org/en/latest/distributing.html).
+* ~~Pip installable? (https://packaging.python.org/en/latest/distributing.html).~~
 * Allow proxy settings to be set.
 
-###Example
+### Example
 ```bash
-$ ./instarecon.py -v -s <shodan_key> -o ~/github.com.csv github.com 
-# InstaRecon v0.1.0 - by Luis Teixeira (teix.co)
+$ instarecon.py -v -s <shodan_key> -o ~/github.com.csv github.com 
+# InstaRecon v0.1.2 - by Luis Teixeira (teix.co)
 # Scanning 1/1 hosts
 # Shodan key provided - <shodan_key>
 
@@ -580,87 +583,6 @@ zendesk.github.com
     103.245.222.133
     http://zendesk.github.com/
 
-# Reverse DNS lookup on range 192.30.252.0/22
-192.30.252.80 - ns1.github.com
-192.30.252.81 - ns2.github.com
-192.30.252.86 - live.github.com
-192.30.252.87 - live.github.com
-192.30.252.88 - live.github.com
-192.30.252.97 - ops-lb-ip1.iad.github.com
-192.30.252.98 - ops-lb-ip2.iad.github.com
-192.30.252.128 - github.com
-192.30.252.129 - github.com
-192.30.252.130 - github.com
-192.30.252.131 - github.com
-192.30.252.132 - assets.github.com
-192.30.252.133 - assets.github.com
-192.30.252.134 - assets.github.com
-192.30.252.135 - assets.github.com
-192.30.252.136 - api.github.com
-192.30.252.137 - api.github.com
-192.30.252.138 - api.github.com
-192.30.252.139 - api.github.com
-192.30.252.140 - gist.github.com
-192.30.252.141 - gist.github.com
-192.30.252.142 - gist.github.com
-192.30.252.143 - gist.github.com
-192.30.252.144 - codeload.github.com
-192.30.252.145 - codeload.github.com
-192.30.252.146 - codeload.github.com
-192.30.252.147 - codeload.github.com
-192.30.252.148 - ssh.github.com
-192.30.252.149 - ssh.github.com
-192.30.252.150 - ssh.github.com
-192.30.252.151 - ssh.github.com
-192.30.252.152 - pages.github.com
-192.30.252.153 - pages.github.com
-192.30.252.154 - pages.github.com
-192.30.252.155 - pages.github.com
-192.30.252.156 - githubusercontent.github.com
-192.30.252.157 - githubusercontent.github.com
-192.30.252.158 - githubusercontent.github.com
-192.30.252.159 - githubusercontent.github.com
-192.30.252.192 - github-smtp2-ext1.iad.github.net
-192.30.252.193 - github-smtp2-ext2.iad.github.net
-192.30.252.194 - github-smtp2-ext3.iad.github.net
-192.30.252.195 - github-smtp2-ext4.iad.github.net
-192.30.252.196 - github-smtp2-ext5.iad.github.net
-192.30.252.197 - github-smtp2-ext6.iad.github.net
-192.30.252.198 - github-smtp2-ext7.iad.github.net
-192.30.252.199 - github-smtp2-ext8.iad.github.net
-192.30.253.1 - ops-puppetmaster1-cp1-prd.iad.github.com
-192.30.253.2 - janky-nix101-cp1-prd.iad.github.com
-192.30.253.3 - janky-nix102-cp1-prd.iad.github.com
-192.30.253.4 - janky-nix103-cp1-prd.iad.github.com
-192.30.253.5 - janky-nix104-cp1-prd.iad.github.com
-192.30.253.6 - janky-nix105-cp1-prd.iad.github.com
-192.30.253.7 - janky-nix106-cp1-prd.iad.github.com
-[-] WARNING:Timeout resolving 192.30.253.8. Retrying.
-192.30.253.8 - janky-nix107-cp1-prd.iad.github.com
-192.30.253.9 - janky-nix108-cp1-prd.iad.github.com
-192.30.253.10 - gw.internaltools-esx1-cp1-prd.iad.github.com
-192.30.253.11 - janky-chromium101-cp1-prd.iad.github.com
-192.30.253.12 - gw.internaltools-esx2-cp1-prd.iad.github.com
-192.30.253.13 - github-mon2ext-cp1-prd.iad.github.net
-192.30.253.16 - github-smtp2a-ext-cp1-prd.iad.github.net
-192.30.253.17 - github-smtp2b-ext-cp1-prd.iad.github.net
-192.30.253.23 - ops-bastion1-cp1-prd.iad.github.com
-192.30.253.30 - github-slowsmtp1-ext-cp1-prd.iad.github.net
-[-] WARNING:Timeout resolving 192.30.253.150. Retrying.
-[-] WARNING:Timeout resolving 192.30.253.174. Retrying.
-[-] WARNING:Timeout resolving 192.30.253.188. Retrying.
-192.30.254.1 - github-lb3a-cp1-prd.iad.github.com
-[-] WARNING:Timeout resolving 192.30.254.2. Retrying.
-192.30.254.2 - github-lb3b-cp1-prd.iad.github.com
-192.30.254.3 - github-lb3c-cp1-prd.iad.github.com
-192.30.254.4 - github-lb3d-cp1-prd.iad.github.com
-[-] WARNING:Timeout resolving 192.30.254.230. Retrying.
-[-] WARNING:Timeout resolving 192.30.255.61. Retrying.
-[-] WARNING:Timeout resolving 192.30.255.99. Retrying.
-[-] WARNING:Timeout resolving 192.30.255.136. Retrying.
-[-] WARNING:Timeout resolving 192.30.255.174. Retrying.
-[-] WARNING:Timeout resolving 192.30.255.211. Retrying.
-[-] WARNING:Timeout resolving 192.30.255.247. Retrying.
 # Saving output csv file
 # Done
 ```
