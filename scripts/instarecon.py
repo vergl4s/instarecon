@@ -189,7 +189,7 @@ class InstaRecon(object):
                 logging.error('No Shodan entries found')
 
         else:
-            print "# Can't do Shodan lookups without a key"
+            print "# Can't do Shodan lookups without a key (pass one with -s or with unix environment variable SHODAN_KEY"
         print ''
 
     def scan_host_google(self, host):
@@ -270,7 +270,7 @@ if __name__ == '__main__':
     parser.add_argument('targets', nargs='+', help='targets to be scanned - can be a domain (google.com), an IP (8.8.8.8) or a network range (8.8.8.0/24)')
     parser.add_argument('-o', '--output', required=False, nargs='?', help='output filename as csv')
     parser.add_argument('-n', '--nameserver', required=False, nargs='?', help='alternative DNS server to query')
-    parser.add_argument('-s', '--shodan_key', required=False, nargs='?', help='shodan key for automated port/service information (SHODAN_KEY environment variable also works for this')
+    parser.add_argument('-s', '--shodan_key', required=False, nargs='?', help='shodan key for automated port/service information (SHODAN_KEY environment variable also works for this)')
     parser.add_argument('-t', '--timeout', required=False, nargs='?', type=float, help='timeout for DNS lookups (default is 2s)')
     parser.add_argument('-v', '--verbose', action='count', default=0, help='verbose errors (-vv or -vvv for extra verbosity)')
     # parser.add_argument('--dns', action='store_true', help='DNS lookups')

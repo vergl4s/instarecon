@@ -32,13 +32,13 @@ setup(
     license='MIT License',
     author='Luis Teixeira',
     install_requires=[
-        'dnspython>=1.12.0',
+        'dnspython>=1.14.0',
         'ipaddr>=2.1.11',
-        'ipaddress>=1.0.7',
-        'ipwhois>=0.10.2',
-        'requests>=2.5.3',
+        'ipaddress>=1.0.16',
+        'ipwhois>=0.13.0',
         'pythonwhois>=2.4.3',
-        'shodan>=1.3.1'
+        'requests>=2.10.0',
+        'shodan>=1.5.3'
     ],
     scripts = ['scripts/instarecon.py'],
     author_email='luis@teix.co',
