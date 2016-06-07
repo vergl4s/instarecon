@@ -92,7 +92,7 @@ def whois_domain(name):
     try:
         query = whois.get_whois(name)
         if 'raw' in query:
-            return query['raw'][0].split('<<<')[0].lstrip().rstrip()
+            return query['raw'][0].split('<<<')[0].lstrip().rstrip().encode('utf-8')
 
     except socket.gaierror as e:
         logging.warning('Whois lookup failed for ' + name)
@@ -105,7 +105,7 @@ def whois_ip(ip):
         except ipw.WhoisLookupError as e:
             raise KeyboardInterrupt
 
-        except ipw.ipwhois.IPDefinedError as e:
+        except ipw.IPDefinedError as e:
             logging.warning(e)
     else:
         logging.warning('No Whois IP for ' + ip + ' as it doesn\'t seem to be an IP on the internet')

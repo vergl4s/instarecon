@@ -189,7 +189,7 @@ class InstaRecon(object):
                 logging.error('No Shodan entries found')
 
         else:
-            print "# Can't do Shodan lookups without a key (pass one with -s or with unix environment variable SHODAN_KEY"
+            print "# Can't do Shodan lookups without a key (pass one with -s or with unix environment variable SHODAN_KEY)"
         print ''
 
     def scan_host_google(self, host):
