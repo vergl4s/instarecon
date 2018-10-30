@@ -18,7 +18,7 @@ InstaRecon will never scan a target directly. Information is retrieved from DNS/
 
 To install simply do:
 ```bash
-./setup.py install
+pip install -r requirements.txt
 ```
 
 Dependencies should be automatically installed. Then go:

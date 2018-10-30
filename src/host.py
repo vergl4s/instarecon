@@ -1,10 +1,11 @@
-#!/usr/bin/env python
 import dns.name  # http://www.dnspython.org/docs/1.12.0/
 import ipaddress as ipa  # https://docs.python.org/3/library/ipaddress.html
 import logging
+import sys
 
-from ip import IP
-import lookup
+from . ip import IP
+from . import lookup
+
 
 class Host(object):
     """
@@ -36,7 +37,7 @@ class Host(object):
 
         # Type check - depends on what parameters have been passed
         if domain:
-            self.type = 'domain'
+            self.type = "domain"
 
             self.domain = domain
             self._get_ips()
@@ -47,7 +48,7 @@ class Host(object):
                 raise ValueError
 
         elif ips:
-            self.type = 'ip'
+            self.type = "ip"
 
             # IP raises ValueError if passed an invalid value
             self.ips = [IP(str(ip), reverse_domains) for ip in ips]
@@ -66,21 +67,21 @@ class Host(object):
         self.cidrs = set()
 
     def __str__(self):
-        if self.type == 'domain':
+        if self.type == "domain":
             return str(self.domain)
-        elif self.type == 'ip':
+        elif self.type == "ip":
             return str(self.ips[0])
 
     def __hash__(self):
-        if self.type == 'domain':
-            return hash(('domain', self.domain))
-        elif self.type == 'ip':
-            return hash(('ip', ','.join([str(ip) for ip in self.ips])))
+        if self.type == "domain":
+            return hash(("domain", self.domain))
+        elif self.type == "ip":
+            return hash(("ip", ",".join([str(ip) for ip in self.ips])))
 
     def __eq__(self, other):
-        if self.type == 'domain':
+        if self.type == "domain":
             return self.domain == other.domain
-        elif self.type == 'ip':
+        elif self.type == "ip":
             return self.ips == other.ips
 
     def lookup_dns(self):
@@ -90,7 +91,7 @@ class Host(object):
         1) Direct DNS lookup on self.domain
         2) Reverse DNS lookup on each self.ips
         """
-        if self.type == 'domain':
+        if self.type == "domain":
             self._get_ips()
         self.lookup_dns_rev_all()
         return self
@@ -157,19 +158,32 @@ class Host(object):
             for ip2 in self.ips:
                 if cidr_found:
                     break
-                if ip1!=ip2:
+                if ip1 != ip2:
                     for cidr in ip2.cidrs:
-                        if ipa.ip_address(unicode(ip1.ip)) in cidr:  # cidr already IPv4.Network obj
+
+                        if sys.version_info[0] == 2:
+                            parsed = unicode(ip1.ip)
+                        else:
+                            parsed = ip1.ip
+
+                        if ipa.ip_address(parsed) in cidr:  # cidr already IPv4.Network obj
                             # If cidr is already in Host, we won't call whois_ip again.
                             # Note cidr already found is not saved in new ips, as it isn't really necessary
                             ip1.whois_ip = ip2.whois_ip
                             ip1.cidrs = ip2.cidrs
                             cidr_found = True
-                            logging.info('Results for ' + str(ip1) + ' already found in ip ' + str(ip2) + '. CIDR is ' + str(cidr))
+                            logging.info(
+                                "Results for "
+                                + str(ip1)
+                                + " already found in ip "
+                                + str(ip2)
+                                + ". CIDR is "
+                                + str(cidr)
+                            )
                             break
 
             if not cidr_found:
-                logging.debug('Performing Whois IP lookup for ' + str(ip1))
+                logging.debug("Performing Whois IP lookup for " + str(ip1))
                 ip1.lookup_whois_ip()
 
         for ip in self.ips:
@@ -201,7 +215,7 @@ class Host(object):
     def google_linkedin_page(self):
         """Finds the most likely linkedin page for self"""
 
-        if self.type == 'domain':
+        if self.type == "domain":
             self.linkedin_page = lookup.google_linkedin_page(self.domain)
 
     def lookup_google_subdomains(self):
@@ -211,16 +225,16 @@ class Host(object):
 
         subdomains_as_hosts = set([])
 
-        for sub_str, google_results in subdomains.iteritems():
-                if sub_str == self.domain:
-                    self.urls = sorted(google_results.urls)
-                else:
-                    try:
-                        sub = Host(domain=sub_str).lookup_dns()
-                        sub.urls = google_results.urls
-                        subdomains_as_hosts.add(sub)
-                    except ValueError as e: # in case it can't be resolved
-                        pass
+        for sub_str, google_results in subdomains.items():
+            if sub_str == self.domain:
+                self.urls = sorted(google_results.urls)
+            else:
+                try:
+                    sub = Host(domain=sub_str).lookup_dns()
+                    sub.urls = google_results.urls
+                    subdomains_as_hosts.add(sub)
+                except ValueError as e:  # in case it can't be resolved
+                    pass
 
         # Hold subdomains in self.google_subdomains
         self.google_subdomains.update(subdomains_as_hosts)
@@ -245,7 +259,9 @@ class Host(object):
             # If subdomain has .domain
             if subdomain.domain:
                 try:
-                    return dns.name.from_text(subdomain.domain).is_subdomain(dns.name.from_text(self.domain))
+                    return dns.name.from_text(subdomain.domain).is_subdomain(
+                        dns.name.from_text(self.domain)
+                    )
                 except Exception as e:
                     pass
 
@@ -288,37 +304,37 @@ class Host(object):
         # Static method that prints a list of domains with its respective ips and rev_domains
         # domains should be a list of Hosts
         if hosts:
-            ret = ''
+            ret = ""
             for host in hosts:
 
-                ret = ''.join([ret, host.domain])
+                ret = "".join([ret, host.domain])
 
                 ips = host.print_all_ips()
                 if ips:
-                    ret = ''.join([ret, '\n\t', ips.replace('\n', '\n\t')])
+                    ret = "".join([ret, "\n\t", ips.replace("\n", "\n\t")])
 
                 urls = host.print_all_urls()
                 if urls:
-                    ret = ''.join([ret, '\n\t', urls.replace('\n','\n\t')])
+                    ret = "".join([ret, "\n\t", urls.replace("\n", "\n\t")])
 
-                ret = ''.join([ret, '\n'])
+                ret = "".join([ret, "\n"])
 
             return ret.rstrip().lstrip()
 
     def print_all_ips(self):
         if self.ips:
-            return '\n'.join([ip.print_ip() for ip in self.ips]).rstrip()
+            return "\n".join([ip.print_ip() for ip in self.ips]).rstrip()
 
     def print_all_cidrs(self):
         if self.cidrs:
-            return '\n'.join([str(cidr) for cidr in self.cidrs])
+            return "\n".join([str(cidr) for cidr in self.cidrs])
 
     def print_all_urls(self):
         if self.urls:
-            ret = ''
-            for proto, paths in self.urls.iteritems():
+            ret = ""
+            for proto, paths in self.urls.items():
                 for path in sorted(paths):
-                    ret = ''.join([ret, '\n', proto, self.domain, path])
+                    ret = "".join([ret, "\n", proto, self.domain, path])
             return ret.rstrip().lstrip()
 
     def print_subdomains(self):
@@ -347,40 +363,40 @@ class Host(object):
             whois_ip = ip.print_whois_ip()
             if whois_ip:
                 results.setdefault(whois_ip, set()).add(str(ip))
-        for whois_ip, set_of_ips in results.iteritems():
-            ret.append(''.join([', '.join(set_of_ips), ':\n', whois_ip]))
+        for whois_ip, set_of_ips in results.items():
+            ret.append("".join([", ".join(set_of_ips), ":\n", whois_ip]))
         return ret
 
     def print_all_shodan(self):
         # Print all Shodan entries (one for each IP in self.ips)
         ret = [ip.print_shodan() for ip in self.ips if ip.shodan]
-        return '\n'.join(ret).lstrip().rstrip()
+        return "\n".join(ret).lstrip().rstrip()
 
     def print_as_csv_lines(self):
         """Generator that yields each IP within self.ips as a csv line."""
 
-        yield ['Target:', str(self)]
+        yield ["Target:", str(self)]
 
         if self.ips:
             yield [
-                'Domain',
-                'IP',
-                'Reverse domains',
-                'NS',
-                'MX',
+                "Domain",
+                "IP",
+                "Reverse domains",
+                "NS",
+                "MX",
                 # 'Subdomains',
-                'Domain whois',
-                'IP whois',
-                'Shodan',
-                'LinkedIn page',
-                'CIDRs',
+                "Domain whois",
+                "IP whois",
+                "Shodan",
+                "LinkedIn page",
+                "CIDRs",
             ]
 
             for ip in self.ips:
                 yield [
                     self.domain,
                     str(ip),
-                    '\n'.join(ip.rev_domains),
+                    "\n".join(ip.rev_domains),
                     self.print_all_ns(),
                     self.print_all_mx(),
                     # self.print_subdomains(),
@@ -388,13 +404,13 @@ class Host(object):
                     ip.print_whois_ip(),
                     ip.print_shodan(),
                     self.linkedin_page,
-                    ', '.join([str(cidr) for cidr in ip.cidrs])
+                    ", ".join([str(cidr) for cidr in ip.cidrs]),
                 ]
 
         if self.subdomains:
-            yield ['\n']
-            yield ['Subdomains for ' + str(self.domain)]
-            yield ['Domain', 'IP', 'Reverse domains', 'URLs']
+            yield ["\n"]
+            yield ["Subdomains for " + str(self.domain)]
+            yield ["Domain", "IP", "Reverse domains", "URLs"]
 
             for sub in sorted(self.subdomains, key=lambda x: x.domain):
                 for ip in sub.ips:
@@ -402,20 +418,25 @@ class Host(object):
                     if sub.domain:
                         line.append(sub.domain)
                     else:
-                        line.append('')
-                    line += [ip.ip, ','.join(ip.rev_domains)]
+                        line.append("")
+                    line += [ip.ip, ",".join(ip.rev_domains)]
                     if sub.urls:
                         line += [sub.print_all_urls()]
                     yield line
 
-
         if self.related_hosts:
-            yield ['\n']
-            yield ['Hosts in same CIDR as ' + str(self) + ' (' + ', '.join([str(cidr) for cidr in self.cidrs]) + ')']
-            yield ['IP', 'Reverse domains']
+            yield ["\n"]
+            yield [
+                "Hosts in same CIDR as "
+                + str(self)
+                + " ("
+                + ", ".join([str(cidr) for cidr in self.cidrs])
+                + ")"
+            ]
+            yield ["IP", "Reverse domains"]
 
             for host in sorted(self.related_hosts, key=lambda x: x.ips[0]):
                 yield [
-                    ','.join([str(ip) for ip in host.ips]),
-                    ','.join([','.join(ip.rev_domains) for ip in host.ips]),
+                    ",".join([str(ip) for ip in host.ips]),
+                    ",".join([",".join(ip.rev_domains) for ip in host.ips]),
                 ]

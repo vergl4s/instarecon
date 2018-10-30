@@ -1,0 +1,16 @@
+certifi==2018.10.15
+chardet==3.0.4
+Click==7.0
+click-plugins==1.0.4
+colorama==0.4.0
+dnspython==1.15.0
+idna==2.7
+ipaddr==2.2.0
+ipaddress==1.0.22
+ipwhois==1.0.0
+pkg-resources==0.0.0
+pythonwhois==2.4.3
+requests==2.20.0
+shodan==1.10.4
+urllib3==1.24
+XlsxWriter==1.1.2
