@@ -12,5 +12,5 @@ pkg-resources==0.0.0
 pythonwhois==2.4.3
 requests==2.20.0
 shodan==1.10.4
-urllib3==1.24
+urllib3==1.26.5
 XlsxWriter==1.1.2
